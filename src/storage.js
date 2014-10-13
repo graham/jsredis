@@ -53,7 +53,7 @@ var storage = (function() {
         request.onsuccess = function() {
             var cursor = request.result;
 
-            var new_value = {'key':key, 'value':value, 'type':'string'};
+            var new_value = {'key':key, 'value':value, 'type':value.constructor.name};
 
             if (cursor) {
                 cursor.update(new_value);
@@ -68,20 +68,20 @@ var storage = (function() {
         }
     };
 
-    var handle_result = function(request, key, callback) {
+    var handle_result = function(table, request, key, callback) {
         return (function() {
             var matching = request.result;
             if (matching !== undefined) {
                 // A match was found.
                 if (callback) {
-                    callback(key, matching);
+                    callback.apply(table, [key, matching]);
                 } else {
                     console.log("Console: " + key + " == " + matching.value + " (" + matching.type + ").");
                 }
             } else {
                 // No match was found.
                 if (callback) {
-                    callback(key, matching);
+                    callback.apply(table, [key, undefined]);
                 } else {
                     console.log("Console: " + key + " == " + null + " (" + null + ").");
                 }
@@ -95,15 +95,37 @@ var storage = (function() {
         var index = store.index("by_key");
         
         var request = index.get(key);
-        request.onsuccess = handle_result(request, key, cb);
+        request.onsuccess = handle_result(this, request, key, cb);
     };
 
-    Table.prototype.lpush = function(key, cb) {
+    Table.prototype.lpush = function(key, new_value, cb) {
         var tx = this.si.transaction(this.table_name);
         var store = tx.objectStore("keys");
         var index = store.index("by_key");
 
         var request = index.get(key);
+        this.get(key, function(key, value) {
+            if (value !== undefined) {
+                this.set(key, [new_value].concat(value.value), cb);
+            } else {
+                this.set(key, [new_value], cb);
+            }
+        });
+    };
+
+    Table.prototype.rpush = function(key, new_value, cb) {
+        var tx = this.si.transaction(this.table_name);
+        var store = tx.objectStore("keys");
+        var index = store.index("by_key");
+
+        var request = index.get(key);
+        this.get(key, function(key, value) {
+            if (value !== undefined) {
+                this.set(key, value.value.concat([new_value]), cb);
+            } else {
+                this.set(key, [new_value], cb);
+            }
+        });
     };
 
     return {
