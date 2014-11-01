@@ -34,58 +34,60 @@ var Beacon = (function() {
         }
         return new_list;
     };
-    
-    var obs = {};
-    var to_remove = [];
 
-    var obs_id = 1;
-    var next_id = function() {
-        obs_id += 1;
-        return obs_id;
+    var Beacon = function() {
+        this.obs = {};
+        this.to_remove = [];
+        this.obs_id = 1;
     };
 
-    var smart_add = function(name, o) {
-        if (obs[name] == undefined) {
-            obs[name] = [o];
+    Beacon.prototype.next_id = function() {
+        this.obs_id += 1;
+        return this.obs_id;
+    };
+
+    Beacon.prototype.smart_add = function(name, o) {
+        if (this.obs[name] == undefined) {
+            this.obs[name] = [o];
         } else {
-            obs[name].push(o);
+            this.obs[name].push(o);
         }
     };
 
-    var event_on = function(name, cb) {
-        var uid = next_id();
-        smart_add(name, [cb, true, uid]);
+    Beacon.prototype.on = function(name, cb) {
+        var uid = this.next_id();
+        this.smart_add(name, [cb, true, uid]);
         return uid;
     };
 
-    var event_once = function(name, cb) {
-        var uid = next_id();
-        smart_add(name, [cb, false, uid]);
+    Beacon.prototype.once = function(name, cb) {
+        var uid = this.next_id();
+        this.smart_add(name, [cb, false, uid]);
         return uid;
     };
 
-    var event_fire = function(name) {
-        if (obs[name] != undefined) {
-            var ll = obs[name];
-            var args = [obs[2]].concat(arguments); //slice.call(arguments, 1)
-            obs[name] = publish_event_to_list(ll, args);
+    Beacon.prototype.fire = function(name) {
+        if (this.obs[name] != undefined) {
+            var ll = this.obs[name];
+            var args = [this.obs[2]].concat(arguments); //slice.call(arguments, 1)
+            this.obs[name] = this.publish_event_to_list(ll, args);
         }
 
-        if (obs['*'] != undefined) {
-            var ll = obs['*'];
-            var args = [obs[2]].concat(arguments); //slice.call(arguments, 1)
-            obs['*'] = publish_event_to_list(ll, args);
+        if (this.obs['*'] != undefined) {
+            var ll = this.obs['*'];
+            var args = [this.obs[2]].concat(arguments); //slice.call(arguments, 1)
+            this.obs['*'] = this.publish_event_to_list(ll, args);
         }
     };
 
-    var publish_event_to_list = function(ll, args) {
+    Beacon.prototype.publish_event_to_list = function(ll, args) {
         var new_list = [];
         var now_final = false;
         
         for(var i = 0; i < ll.length; i += 1) {
-            if (x_in_list(ll[i][2], to_remove)) {
+            if (x_in_list(ll[i][2], this.to_remove)) {
                 // pass, either it's not a continue, or it's in the remove list.
-                to_remove = remove_x_from_list(ll[i][2], to_remove);
+                this.to_remove = remove_x_from_list(ll[i][2], to_remove);
             } else {
                 now_final = ll[i][0].apply(null, args);
                 if (now_final != false) {
@@ -98,21 +100,14 @@ var Beacon = (function() {
         return new_list;
     };
 
-    var reset = function() {
-        obs = {};
+    Beacon.prototype.reset = function() {
+        this.obs = {};
     };
 
     var remove = function(uid) {
-        to_remove.push(uid);
+        this.to_remove.push(uid);
     };
 
-    return {
-        'on':event_on, 
-        'once':event_once, 
-        'fire':event_fire, 
-        'reset':reset, 
-        'remove':remove
-    };
-
+    return Beacon;
 })();
 

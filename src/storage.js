@@ -3,7 +3,7 @@ var storage = (function() {
         var si = this;
 
         this.db = null;
-
+        this.beacon = new Beacon();
         db_hook = indexedDB.open("jsredis_storage");
 
         // This will only be called if the database didn't previously exist
@@ -67,86 +67,48 @@ var storage = (function() {
         }
     };
 
-    Table.prototype.set = function(key, value, cb) {
-        var tx = this.si.transaction(this.table_name);
-        var store = tx.objectStore("keys");
-        var index = store.index("by_key");
+    Table.prototype.set = function(key, value) {
+        return new Promise(function(resolve, reject) {
+            
+            var tx = this.si.transaction(this.table_name);
+            var store = tx.objectStore("keys");
+            var index = store.index("by_key");
 
-        var request = index.openCursor(IDBKeyRange.only(key));
-        request.onsuccess = function() {
-            var cursor = request.result;
+            var request = index.openCursor(IDBKeyRange.only(key));
+            request.onsuccess = function() {
+                var cursor = request.result;
+                var new_value = {'key':key, 'value':value, 'type':value.constructor.name};
 
-            var new_value = {'key':key, 'value':value, 'type':value.constructor.name};
-
-            if (cursor) {
-                cursor.update(new_value);
-            } else {
-                store.put(new_value)
-                tx.oncomplete = function() {
-                    if (cb) {
-                        cb(key, new_value);
-                    }
-                };
-            }
-        }
-    };
-
-    var handle_result = function(table, request, key, callback) {
-        return (function() {
-            var matching = request.result;
-            if (matching !== undefined) {
-                // A match was found.
-                if (callback) {
-                    callback.apply(table, [key, matching]);
+                if (cursor) {
+                    cursor.update(new_value);
+                    resolve(this.table_name, key, new_value);
                 } else {
-                    console.log("Console: " + key + " == " + matching.value + " (" + matching.type + ").");
+                    store.put(new_value)
+                    tx.oncomplete = function() {
+                        resolve(this.table_name, key, new_value);
+                    };
                 }
-            } else {
-                // No match was found.
-                if (callback) {
-                    callback.apply(table, [key, undefined]);
-                } else {
-                    console.log("Console: " + key + " == " + null + " (" + null + ").");
-                }
-            }
-        })
-    };
-
-    Table.prototype.get = function(key, cb) {
-        var tx = this.si.transaction(this.table_name);
-        var store = tx.objectStore("keys");
-        var index = store.index("by_key");
-        
-        var request = index.get(key);
-        request.onsuccess = handle_result(this, request, key, cb);
-    };
-
-    Table.prototype.lpush = function(key, new_value, cb) {
-        var tx = this.si.transaction(this.table_name);
-        var store = tx.objectStore("keys");
-        var index = store.index("by_key");
-
-        var request = index.get(key);
-        this.get(key, function(key, value) {
-            if (value !== undefined) {
-                this.set(key, [new_value].concat(value.value), cb);
-            } else {
-                this.set(key, [new_value], cb);
-            }
+            };
+            
+            request.onerror = function() {
+                reject(this.table_name, key);
+            };
         });
     };
-
-    Table.prototype.rpush = function(key, new_value, cb) {
-        var tx = this.si.transaction(this.table_name);
-        var store = tx.objectStore("keys");
-        var index = store.index("by_key");
-
-        var request = index.get(key);
-        this.get(key, function(key, value) {
-            if (value !== undefined) {
-                this.set(key, value.value.concat([new_value]), cb);
-            } else {
-                this.set(key, [new_value], cb);
+    
+    Table.prototype.get = function(key) {
+        return new Promise(function(resolve, reject) {
+            var tx = this.si.transaction(this.table_name);
+            var store = tx.objectStore("keys");
+            var index = store.index("by_key");
+            
+            var request = index.get(key);
+            request.onsuccess = function() {
+                var matching = request.result;
+                resolve(this.table_name, key, matching);
+            }
+            request.onerror = function() {
+                reject(this.table_name, key);
             }
         });
     };
