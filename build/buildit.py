@@ -6,6 +6,9 @@ module_name = 'jsredis'
 
 def create_file():
     lib_content = []
+    for i in os.listdir('lib'):
+        lib_content.append(open('lib/%s' % i).read())
+
     for i in os.listdir('src'):
         lib_content.append(open('src/%s' % i).read())
         
@@ -23,9 +26,9 @@ var %s_module = {};
 
     content = []
 
-    for i in (start, '\n'.join(lib_content), end):
+    for i in (start, '\n\n'.join(lib_content), end):
         content.append(i)
-        content.append('\n')
+        content.append('\n\n')
 
     return content
 

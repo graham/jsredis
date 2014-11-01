@@ -44,6 +44,29 @@ var storage = (function() {
         this.table_name = table_name;
     };
 
+    Table.prototype.search_subindex = function(key, cb) {
+        var tx = this.si.transaction(this.table_name);
+        var store = tx.objectStore("keys");
+        var index = store.index("by_key");
+
+        var request = index.openCursor(IDBKeyRange.bound(key+"/", key+":"));
+        var results = [];
+        request.onsuccess = function() {
+            var cursor = request.result;
+
+            if (cursor) {
+                results.push(cursor.value);
+                cursor.continue();
+            } else {
+                if (cb) {
+                    cb(key, results);
+                } else {
+                    console.log(key, results);
+                }                
+            }
+        }
+    };
+
     Table.prototype.set = function(key, value, cb) {
         var tx = this.si.transaction(this.table_name);
         var store = tx.objectStore("keys");
