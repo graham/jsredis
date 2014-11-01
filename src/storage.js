@@ -68,9 +68,10 @@ var storage = (function() {
     };
 
     Table.prototype.set = function(key, value) {
+        var si = this.si;
+        var table_name = this.table_name;
         return new Promise(function(resolve, reject) {
-            
-            var tx = this.si.transaction(this.table_name);
+            var tx = si.transaction(table_name);
             var store = tx.objectStore("keys");
             var index = store.index("by_key");
 
@@ -81,35 +82,53 @@ var storage = (function() {
 
                 if (cursor) {
                     cursor.update(new_value);
-                    resolve(this.table_name, key, new_value);
+                    resolve(new_value);
                 } else {
                     store.put(new_value)
                     tx.oncomplete = function() {
-                        resolve(this.table_name, key, new_value);
+                        resolve(new_value);
                     };
                 }
             };
             
             request.onerror = function() {
-                reject(this.table_name, key);
+                reject(key);
             };
         });
     };
     
     Table.prototype.get = function(key) {
+        var si = this.si;
+        var table_name = this.table_name;
         return new Promise(function(resolve, reject) {
-            var tx = this.si.transaction(this.table_name);
+            var tx = si.transaction(table_name);
             var store = tx.objectStore("keys");
             var index = store.index("by_key");
             
             var request = index.get(key);
             request.onsuccess = function() {
                 var matching = request.result;
-                resolve(this.table_name, key, matching);
+                resolve(matching);
             }
             request.onerror = function() {
-                reject(this.table_name, key);
+                reject(key);
             }
+        });
+    };
+
+    Table.prototype.mget = function() {
+        var the_table = this;
+        var par_arguments = arguments;
+        
+        return new Promise(function(resolve, reject) {
+            var keys = par_arguments;
+            var promises = [];
+            
+            for(var i=0; i < par_arguments.length; i++) {
+                var key = par_arguments[i];
+                promises.push(the_table.get(key));
+            }
+            Promise.all(promises).then(function(accum) { resolve(accum); })
         });
     };
 
