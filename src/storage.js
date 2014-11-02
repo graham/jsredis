@@ -1,34 +1,76 @@
 var storage = (function() {
-    var StorageInstance = function() {
-        var si = this;
-
-        this.db = null;
+    var TIMEOUT_MS = 5;
+    
+    var StorageInstance = function(dbn) {
+        if (dbn != undefined) {
+            this.dbname = dbn;
+        } else {
+            this.dbname = 'jsredis_storage';
+        }
         this.beacon = new Beacon();
-        db_hook = indexedDB.open("jsredis_storage");
-
-        // This will only be called if the database didn't previously exist
-        // or if the version number has changed.
-        db_hook.onupgradeneeded = function() {
-            var db = db_hook.result;
-            si.on_load(db);
-
-            var store = db.createObjectStore("keys", {keyPath: "key"});
-            var keyIndex = store.createIndex("by_key", "key", {unique:true});
-            
-            var meta_store = db.createObjectStore("meta_keys", {keyPath: "key"});
-            var metKeyIndex = meta_store.createIndex("by_key", "key", {unique:true});
-        };
-
-        // We've successfully connected to the database, because it already
-        // existed and we can just start working.
-        db_hook.onsuccess = function() {
-            si.on_load(db_hook.result);
-        };
     };
 
-    StorageInstance.prototype.on_load = function(db) {
-        this.db = db;
-        console.log("database opened.");
+    StorageInstance.prototype.init_db = function() {
+        var si = this;
+        if (this.db) { this.db.close(); }
+        this.db = null;
+
+        return new Promise(function(resolve, reject) {
+            var db_hook = indexedDB.open(si.dbname);
+            
+            // This will only be called if the database didn't previously exist
+            // or if the version number has changed.
+            db_hook.onupgradeneeded = function() {
+                var db = db_hook.result;
+                
+                var store = db.createObjectStore("keys", {keyPath: "key"});
+                var keyIndex = store.createIndex("by_key", "key", {unique:true});
+                
+                var meta_store = db.createObjectStore("meta_keys", {keyPath: "key"});
+                var metKeyIndex = meta_store.createIndex("by_key", "key", {unique:true});
+                
+                si.db = db;
+                setTimeout(resolve, TIMEOUT_MS);
+            };
+            
+            // We've successfully connected to the database, because it already
+            // existed and we can just start working.
+            db_hook.onsuccess = function() {
+                console.log('Connected to database.');
+                si.db = db_hook.result;
+                setTimeout(resolve, TIMEOUT_MS);
+            };
+            db_hook.onerror = function() {
+                console.log(db_hook.error);
+                reject();
+            };
+        });
+    };
+
+    StorageInstance.prototype.reset_all_data = function() {
+        var si = this;
+        if (this.db) { this.db.close(); }
+        return new Promise(function(resolve, reject) {
+            setTimeout( function() {
+                var req = indexedDB.deleteDatabase( si.dbname );
+                
+                req.onsuccess = function () {
+                    setTimeout(resolve, TIMEOUT_MS);
+                };
+                req.onerror = function () {
+                    console.log('reset error');                
+                    reject();
+                };
+                req.onblocked = function () {
+                    console.log('reset blocked')                
+                    reject();
+                };
+            }, TIMEOUT_MS);
+        });            
+    };
+    
+    StorageInstance.prototype.on = function(key, cb) {
+        this.beacon.on(key, cb);
     };
 
     StorageInstance.prototype.transaction = function(table) {
