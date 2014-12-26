@@ -1,13 +1,182 @@
+var DEBUG = true;
+var log = function() {
+    for(var i = 0; i < arguments.length; i++) {
+        console.log(arguments[i]);
+    }
+};
+
+var PromiseValue = function() {
+        var _this = this;
+        this.internal_promise = new Promise(function(resolve, reject) {
+            _this.resolve = resolve;
+            _this.reject = reject;
+        });
+    };
+
+PromiseValue.prototype.then = function(good, bad) {
+    this.internal_promise.then(good, bad);
+};
+
+PromiseValue.prototype.resolve = function(value) {
+    this.resolve(value);
+};
+
+PromiseValue.prototype.reject = function(err) {
+    this.reject(err);
+};
+
+
 var storage = (function() {
+    var COMMANDS = {};
     var TIMEOUT_MS = 5;
-    
+
+    COMMANDS['wait'] = function(si, tx, args, result, dbhandle) {
+        var value = parseInt(args[0]);
+        if (isNaN(value)) {
+            value = 1000;
+        }
+
+        dbhandle.resolve();
+        setTimeout(function() {
+            result.resolve('100');
+        }, value);
+    };
+
+    COMMANDS['get'] = function(si, tx, args, result, dbhandle) {
+        var key = args[0];
+        var store = tx.objectStore("keys");
+        var index = store.index("by_key");
+            
+        var request = index.get(key);
+        request.onsuccess = function() {
+            var matching = request.result;
+            result.resolve(matching);
+            dbhandle.resolve();
+        }
+        request.onerror = function() {
+            result.reject(key);
+            dbhandle.resolve();
+        }
+    };
+
+    COMMANDS['set'] = function(si, tx, args, result, dbhandle) {
+        var key = args[0];
+        var value = args[1];
+
+        var store = tx.objectStore("keys");
+        var index = store.index("by_key");
+        var request = index.openCursor(IDBKeyRange.only(key));
+        
+        request.onsuccess = function() {
+            var cursor = request.result;
+            var new_value = {'key':key, 'value':value, 'type':value.constructor.name};
+            
+            if (cursor) {
+                cursor.update(new_value);
+                result.resolve(new_value);
+                dbhandle.resolve();
+            } else {
+                store.put(new_value)
+                tx.oncomplete = function() {
+                    result.resolve(new_value);
+                    dbhandle.resolve();
+                };
+            }
+        };
+        
+        request.onerror = function() {
+            result.reject(key);
+            dbhandle.resolve();
+        };
+    };
+
+    COMMANDS['rpush'] = function(si, tx, args, result, dbhandle) {
+        si.cmd('get', args[0]).then(function(r) {
+            if (r == undefined) {
+                // key doesn't exist yet.
+                var nargs = args.slice(1);
+                si.cmd('set', args[0], JSON.stringify(nargs));
+                result.resolve(nargs.length);
+            } else {
+                var nargs = args.slice(1);
+                var prev = JSON.parse(r.value);
+                var newval = prev.concat(nargs);
+                si.cmd('set', args[0], JSON.stringify(newval));
+                result.resolve(newval.length);
+            }
+        });
+        dbhandle.resolve();
+    };
+
+    COMMANDS['lpush'] = function(si, tx, args, result, dbhandle) {
+        si.cmd('get', args[0]).then(function(r) {
+            if (r == undefined) {
+                // key doesn't exist yet.
+                var nargs = args.slice(1);
+                si.cmd('set', args[0], JSON.stringify(nargs));
+                result.resolve(nargs.length);
+            } else {
+                var nargs = args.slice(1);
+                var prev = JSON.parse(r.value);
+                var newval = nargs.concat(prev);
+                si.cmd('set', args[0], JSON.stringify(newval));
+                result.resolve(newval.length);
+            }
+        });
+        dbhandle.resolve();
+    };
+
+    COMMANDS['lpop'] = function(si, tx, args, result, dbhandle) {
+        si.cmd('get', args[0]).then(function(r) {
+            if (r == undefined) {
+                // key doesn't exist yet.
+                var nargs = args.slice(1);
+                si.cmd('set', args[0], JSON.stringify(nargs));
+                result.resolve(undefined);
+            } else {
+                var nargs = args.slice(1);
+                var prev = JSON.parse(r.value);
+                var ret = prev[0];
+                var newval = prev.slice(1);
+                si.cmd('set', args[0], JSON.stringify(newval));
+                result.resolve(ret);
+            }
+        });
+        dbhandle.resolve();        
+    };
+
+    COMMANDS['rpop'] = function(si, tx, args, result, dbhandle) {
+        si.cmd('get', args[0]).then(function(r) {
+            if (r == undefined) {
+                // key doesn't exist yet.
+                var nargs = args.slice(1);
+                si.cmd('set', args[0], JSON.stringify(nargs));
+                result.resolve(undefined);
+            } else {
+                var nargs = args.slice(1);
+                var prev = JSON.parse(r.value);
+                var ret = prev[prev.length-1];
+                var newval = prev.slice(0,prev.length-1);
+                si.cmd('set', args[0], JSON.stringify(newval));
+                result.resolve(ret);
+            }
+        });
+        dbhandle.resolve();        
+    };
+
     var StorageInstance = function(dbn) {
+        this.events = {};
+        this.ready = new PromiseValue();
+        
         if (dbn != undefined) {
             this.dbname = dbn;
         } else {
             this.dbname = 'jsredis_storage';
         }
-        this.beacon = new Beacon();
+
+        this.command_queue = [];
+        this.process_next_flag = 0;
+        this.looper = null;
     };
 
     StorageInstance.prototype.init_db = function() {
@@ -15,7 +184,7 @@ var storage = (function() {
         if (this.db) { this.db.close(); }
         this.db = null;
 
-        return new Promise(function(resolve, reject) {
+        var p = new Promise(function(resolve, reject) {
             var db_hook = indexedDB.open(si.dbname);
             
             // This will only be called if the database didn't previously exist
@@ -30,6 +199,7 @@ var storage = (function() {
                 var metKeyIndex = meta_store.createIndex("by_key", "key", {unique:true});
                 
                 si.db = db;
+                console.log("database created");
                 setTimeout(resolve, TIMEOUT_MS);
             };
             
@@ -45,6 +215,12 @@ var storage = (function() {
                 reject();
             };
         });
+
+        p.then(function() {
+            si.ready.resolve();
+        });
+        
+        return p;
     };
 
     StorageInstance.prototype.reset_all_data = function() {
@@ -69,109 +245,73 @@ var storage = (function() {
         });            
     };
     
-    StorageInstance.prototype.on = function(key, cb) {
-        this.beacon.on(key, cb);
-    };
-
     StorageInstance.prototype.transaction = function(table) {
         return this.db.transaction(table, "readwrite");
     };
 
-    StorageInstance.prototype.table = function(name) {
-        return new Table(this, name);
-    };
+    StorageInstance.prototype.consume_queue = function() {
+        var _this = this;
+        
+        if (this.command_queue.length > 0) {
+            var command = this.command_queue[0];
+            this.command_queue = this.command_queue.slice(1);
 
-    var Table = function(si, table_name) {
-        this.si = si;
-        this.table_name = table_name;
-    };
-
-    Table.prototype.search_subindex = function(key, cb) {
-        var tx = this.si.transaction(this.table_name);
-        var store = tx.objectStore("keys");
-        var index = store.index("by_key");
-
-        var request = index.openCursor(IDBKeyRange.bound(key+"/", key+":"));
-        var results = [];
-        request.onsuccess = function() {
-            var cursor = request.result;
-
-            if (cursor) {
-                results.push(cursor.value);
-                cursor.continue();
-            } else {
-                if (cb) {
-                    cb(key, results);
-                } else {
-                    console.log(key, results);
-                }                
+            var result_promise = command[0];
+            
+            var callback = COMMANDS[command[1]];
+            if (callback == undefined) {
+                throw "Undefined command: " + command[0];
             }
+
+            var args = command[2];
+            var dbhandle = new PromiseValue();
+            var p = callback(_this, this.transaction('keys'), args, result_promise, dbhandle);
+            
+            dbhandle.then(function() {
+                _this.looper = setTimeout(function() { _this.consume_queue(); }, TIMEOUT_MS);
+            });
+        } else {
+            console.log("Empty Queue.");
+            _this.looper = null;
         }
     };
 
-    Table.prototype.set = function(key, value) {
-        var si = this.si;
-        var table_name = this.table_name;
-        return new Promise(function(resolve, reject) {
-            var tx = si.transaction(table_name);
-            var store = tx.objectStore("keys");
-            var index = store.index("by_key");
-
-            var request = index.openCursor(IDBKeyRange.only(key));
-            request.onsuccess = function() {
-                var cursor = request.result;
-                var new_value = {'key':key, 'value':value, 'type':value.constructor.name};
-
-                if (cursor) {
-                    cursor.update(new_value);
-                    resolve(new_value);
-                } else {
-                    store.put(new_value)
-                    tx.oncomplete = function() {
-                        resolve(new_value);
-                    };
-                }
-            };
-            
-            request.onerror = function() {
-                reject(key);
-            };
-        });
-    };
-    
-    Table.prototype.get = function(key) {
-        var si = this.si;
-        var table_name = this.table_name;
-        return new Promise(function(resolve, reject) {
-            var tx = si.transaction(table_name);
-            var store = tx.objectStore("keys");
-            var index = store.index("by_key");
-            
-            var request = index.get(key);
-            request.onsuccess = function() {
-                var matching = request.result;
-                resolve(matching);
-            }
-            request.onerror = function() {
-                reject(key);
-            }
-        });
+    StorageInstance.prototype.process = function() {
+        var _this = this;
+        this.process_next_flag += 1;
+        if (this.looper == null) {
+            this.looper = setTimeout(function() { _this.consume_queue(); }, TIMEOUT_MS);
+        }
     };
 
-    Table.prototype.mget = function() {
-        var the_table = this;
-        var par_arguments = arguments;
-        
-        return new Promise(function(resolve, reject) {
-            var keys = par_arguments;
-            var promises = [];
-            
-            for(var i=0; i < par_arguments.length; i++) {
-                var key = par_arguments[i];
-                promises.push(the_table.get(key));
-            }
-            Promise.all(promises).then(function(accum) { resolve(accum); })
-        });
+    StorageInstance.prototype.set = function(key, value) {
+        var result = new PromiseValue();
+        this.command_queue.push([result, 'set', [key, value]]);
+        this.process();
+        return result;
+    };
+
+    StorageInstance.prototype.get = function(key) {
+        var result = new PromiseValue();
+        this.command_queue.push([result, 'get', [key]]);
+        this.process();
+        return result;
+    };
+
+    StorageInstance.prototype.cmd = function() {
+        var newargs = Array.prototype.slice.call(arguments);
+        var result = new PromiseValue();
+        this.command_queue.push([result, newargs[0], newargs.slice(1)]);
+        this.process();
+        return result;
+    };
+
+    StorageInstance.prototype.prep = function() {
+        var newargs = Array.prototype.slice.call(arguments);
+        var result = new PromiseValue();
+        this.command_queue = [[result, newargs[0], newargs.slice(1)]].concat(this.command_queue);
+        this.process();
+        return result;
     };
 
     return {
@@ -182,3 +322,4 @@ var storage = (function() {
 if (typeof jsredis_module !== 'undefined') {
     jsredis_module.exports.storage = storage;
 }
+

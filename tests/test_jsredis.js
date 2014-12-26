@@ -17,7 +17,6 @@ describe("JSRedis Core DB Functions", function() {
 });
 
 describe("JSRedis String Functions", function() {
-
     beforeEach(function(done) {
         conn.reset_all_data().then(function() {
             conn.init_db().then(function() {
@@ -27,30 +26,33 @@ describe("JSRedis String Functions", function() {
     });
 
     it("get/set should work.", function(done) {
-        var table = conn.table('keys');
-        table.set('test', 'aweso').then(function(data) {
+        conn.set('test', 'aweso').then(function(data) {
             expect(data.value).toEqual('aweso');
             done();
         });
     });
 
     it("should get multiple values, even if they don't exist.", function(done) {
-        var table = conn.table('keys');
-        table.set('one', '111');
-        table.set('two', '222');
-        table.mget('one', 'two').then(function(data) {
-            expect(data[0].value).toEqual('111');
+        conn.set('one', 111);
+        conn.set('two', '222');
+        conn.mget('one', 'two').then(function(data) {
+            expect(data[0].value).toEqual(111);
             expect(data[1].value).toEqual('222');
             done();
         });
     });
 
     it("should not be able to get a value that doesn't exist", function(done) {
-        var table = conn.table('keys');
-        table.get('asdfasdf').then(function(data) {
+        conn.get('asdfasdf').then(function(data) {
             expect(data).toEqual(undefined);
             done();
         });
     });
+
+    it("should support mset", function(done) {
+        conn.mset('one', 1, 'two', 2).then(function(data) {
+            done();
+        });
+    })
         
 });

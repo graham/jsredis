@@ -111,3 +111,23 @@ var Beacon = (function() {
     return Beacon;
 })();
 
+var PromiseValue = function() {
+        var _this = this;
+        this.internal_promise = new Promise(function(resolve, reject) {
+            _this.resolve = resolve;
+            _this.reject = reject;
+        });
+    };
+
+PromiseValue.prototype.then = function(fun) {
+    this.internal_promise.then(fun);
+};
+
+PromiseValue.prototype.resolve = function(value) {
+    this.resolve(value);
+};
+
+PromiseValue.prototype.reject = function(err) {
+    this.reject(err);
+};
+
