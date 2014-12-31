@@ -1,33 +1,46 @@
-var conn = new storage.Storage('jsredis-test-suite');
+var conn = null;
 
-describe("JSRedis Core DB Functions", function() {
-    it("Should be ok with multiple calls to init.", function(done) {
-        conn.init_db().then(function() {
-            done();
-        });
-    });
+describe("Simple Index Functions", function() {
+    beforeEach(function(done) {
+        if (conn) {
+            conn.close();
+        }
 
-    it("Should be able to be cleared and re-initialized easily.", function(done) {
+        conn = new SimpleIndex('simple-index-test-suite');
         conn.reset_all_data().then(function() {
             conn.init_db().then(function() {
                 done();
             });
-        });            
+        });
+    });
+
+    it("should have get/set methods that work.", function(done) {
+        conn.set('test', 'value').then(function() {
+            conn.get('test').then(function(value) {
+                expect(value).toEqual('value');
+                done();
+            })
+        });
     });
 });
 
 describe("JSRedis String Functions", function() {
     beforeEach(function(done) {
+        if (conn) {
+            conn.close();
+        }
+
+        conn = new SimpleRedis('js-redis-test-suite');
         conn.reset_all_data().then(function() {
             conn.init_db().then(function() {
                 done();
             });
-        });            
+        });
     });
 
     it("get/set should work.", function(done) {
         conn.set('test', 'aweso').then(function(data) {
-            expect(data.value).toEqual('aweso');
+            expect(data).toEqual('aweso');
             done();
         });
     });
@@ -36,7 +49,7 @@ describe("JSRedis String Functions", function() {
         conn.set('one', 111);
         conn.set('two', '222');
         conn.get('two').then(function(data) {
-            expect(data.value).toEqual('222');
+            expect(data).toEqual('222');
             done();
         });
     });
