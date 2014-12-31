@@ -126,6 +126,7 @@ describe("JSRedis String Functions", function() {
     });
 
     it("should support lrem.", function(done) {
+        expect(false).toEqual(true);
         done();
     });
 });
