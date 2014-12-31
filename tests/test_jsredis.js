@@ -108,7 +108,7 @@ describe("JSRedis String Functions", function() {
         });
     });
 
-    it("should do stuff", function(done) {
+    it("should support lindex correctly (including negative)", function(done) {
         conn.all([
             conn.cmd('rpush', 'mylist', 1),
             conn.cmd('rpush', 'mylist', 2),
@@ -123,5 +123,9 @@ describe("JSRedis String Functions", function() {
                 done();
             });
         });
+    });
+
+    it("should support lrem.", function(done) {
+        done();
     });
 });
