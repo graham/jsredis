@@ -3,7 +3,7 @@ var l = function() {
 }
 
 var SimpleIndex = (function() {
-    var TIMEOUT_MS = 10;
+    var TIMEOUT_MS = 1;
     
     var PromiseValue = function() {
         var _this = this;
@@ -29,7 +29,8 @@ var SimpleIndex = (function() {
     };
 
     var CORE_COMMANDS = {};
-    CORE_COMMANDS['get'] = function(si, tx, args, result, dbhandle) {
+    CORE_COMMANDS['get'] = function(si, args, result, dbhandle) {
+        var tx = si.db.transaction('keys', 'readwrite');        
         var key = args[0];
         var store = tx.objectStore("keys");
         var index = store.index("by_key");
@@ -38,9 +39,9 @@ var SimpleIndex = (function() {
         request.onsuccess = function() {
             var matching = request.result;
             if (!matching) {
-                result.resolve(undefined, matching);
+                result.resolve(undefined);
             } else {
-                result.resolve(matching.value, matching);
+                result.resolve(matching.value);
             }
             dbhandle.resolve();
         }
@@ -50,7 +51,30 @@ var SimpleIndex = (function() {
         }
     };
 
-    CORE_COMMANDS['set'] = function(si, tx, args, result, dbhandle) {
+    CORE_COMMANDS['exists'] = function(si, args, result, dbhandle) {
+        var tx = si.db.transaction('keys', 'readwrite');        
+        var key = args[0];
+        var store = tx.objectStore("keys");
+        var index = store.index("by_key");
+            
+        var request = index.get(key);
+        request.onsuccess = function() {
+            var matching = request.result;
+            if (!matching) {
+                result.resolve(false);
+            } else {
+                result.resolve(true);
+            }
+            dbhandle.resolve();
+        }
+        request.onerror = function() {
+            result.reject(key);
+            dbhandle.resolve();
+        }
+    };
+
+    CORE_COMMANDS['set'] = function(si, args, result, dbhandle) {
+        var tx = si.db.transaction('keys', 'readwrite');
         var key = args[0];
         var value = args[1];
 
@@ -64,12 +88,12 @@ var SimpleIndex = (function() {
             
             if (cursor) {
                 cursor.update(new_value);
-                result.resolve(value, new_value);
+                result.resolve(value);
                 dbhandle.resolve();
             } else {
                 store.put(new_value)
                 tx.oncomplete = function() {
-                    result.resolve(value, new_value);
+                    result.resolve(value);
                     dbhandle.resolve();
                 };
             }
@@ -103,7 +127,7 @@ var SimpleIndex = (function() {
         this.db = null;
         this.command_queue = [];
         
-        var dbp = new Promise(function(resolve, reject) {
+        this.ready = new Promise(function(resolve, reject) {
             var db_hook = indexedDB.open(_this.name);
             
             // This will only be called if the database didn't previously exist
@@ -132,7 +156,7 @@ var SimpleIndex = (function() {
                 reject();
             };
         });
-        return dbp;
+        return this.ready;
     };
 
     Simple.prototype.cmd = function() {
@@ -143,6 +167,14 @@ var SimpleIndex = (function() {
         return result;
     };
 
+    Simple.prototype.prep = function() {
+        var newargs = Array.prototype.slice.call(arguments);
+        var result = new PromiseValue();
+        this.command_queue = [[newargs[0], newargs.slice(1), result]].concat(this.command_queue);
+        this.process();
+        return result;
+    };
+    
     Simple.prototype.get = function(key) {
         return this.cmd('get', key);
     };
@@ -167,28 +199,32 @@ var SimpleIndex = (function() {
         var _this = this;
         
         if (this.db) { this.db.close(); }
+        
         this.db = null;
         if (this.looper) {
             clearTimeout(this.looper);
         }
         this.looper = null;
         this.command_queue = [];
+        
 
         return new Promise(function(resolve, reject) {
-            var req = indexedDB.deleteDatabase( _this.name );
+            setTimeout(function() {
+                var req = indexedDB.deleteDatabase( _this.name );
             
-            req.onsuccess = function () {
-                console.log('reset successful.');
-                setTimeout(resolve, TIMEOUT_MS);
-            };
-            req.onerror = function () {
-                console.log('reset error');                
-                setTimeout(reject, TIMEOUT_MS);
-            };
-            req.onblocked = function () {
-                console.log('reset blocked')                
-                setTimeout(reject, TIMEOUT_MS);
-            };
+                req.onsuccess = function () {
+                    console.log('reset successful.');
+                    setTimeout(resolve, TIMEOUT_MS);
+                };
+                req.onerror = function () {
+                    console.log('reset error');                
+                    setTimeout(reject, TIMEOUT_MS);
+                };
+                req.onblocked = function () {
+                    console.log('reset blocked')                
+                    setTimeout(reject, TIMEOUT_MS);
+                };
+            }, TIMEOUT_MS);
         });
     };
 
@@ -213,7 +249,7 @@ var SimpleIndex = (function() {
             var dbhandle = new PromiseValue();
             
             var result_promise = command[2];
-            var p = callback(_this, _this.db.transaction("keys", "readwrite"), args, result_promise, dbhandle);
+            var p = callback(_this, args, result_promise, dbhandle);
             
             dbhandle.then(function() {
                 _this.looper = setTimeout(function() { _this.consume_queue(); }, TIMEOUT_MS);
@@ -242,75 +278,93 @@ var SimpleRedis = (function() {
     var SimpleRedisCore = function(name) {
         this.name = name;
         
-        this.COMMANDS['rpush'] = function(si, tx, args, result, dbhandle) {
-            si.cmd('get', args[0]).then(function(r) {
-                if (r == undefined) {
-                    // key doesn't exist yet.
-                    var nargs = args.slice(1);
-                    si.cmd('set', args[0], JSON.stringify(nargs));
-                    result.resolve(nargs.length);
-                } else {
-                    var nargs = args.slice(1);
-                    var prev = JSON.parse(r.value);
-                    var newval = prev.concat(nargs);
-                    si.cmd('set', args[0], JSON.stringify(newval));
-                    result.resolve(newval.length);
-            }
-            });
+        this.COMMANDS['rpush'] = function(si, args, result, dbhandle) {
             dbhandle.resolve();
-        };
-        
-        this.COMMANDS['lpush'] = function(si, tx, args, result, dbhandle) {
-            si.cmd('get', args[0]).then(function(r) {
+            si.prep('get', args[0]).then(function(r) {
                 if (r == undefined) {
                     // key doesn't exist yet.
                     var nargs = args.slice(1);
-                    si.cmd('set', args[0], JSON.stringify(nargs));
+                    si.prep('set', args[0], JSON.stringify(nargs));
                     result.resolve(nargs.length);
                 } else {
                     var nargs = args.slice(1);
-                    var prev = JSON.parse(r.value);
-                    var newval = nargs.concat(prev);
-                    si.cmd('set', args[0], JSON.stringify(newval));
+                    var prev = JSON.parse(r);
+                    var newval = prev.concat(nargs);
+                    si.prep('set', args[0], JSON.stringify(newval));
                     result.resolve(newval.length);
                 }
             });
-            dbhandle.resolve();
         };
         
-        this.COMMANDS['lpop'] = function(si, tx, args, result, dbhandle) {
-            si.cmd('get', args[0]).then(function(r) {
+        this.COMMANDS['lpush'] = function(si, args, result, dbhandle) {
+            dbhandle.resolve();
+            si.prep('get', args[0]).then(function(r) {
                 if (r == undefined) {
                     // key doesn't exist yet.
                     var nargs = args.slice(1);
-                    si.cmd('set', args[0], JSON.stringify(nargs));
+                    si.prep('set', args[0], JSON.stringify(nargs));
+                    result.resolve(nargs.length);
+                } else {
+                    var nargs = args.slice(1);
+                    var prev = JSON.parse(r);
+                    var newval = nargs.concat(prev);
+                    si.prep('set', args[0], JSON.stringify(newval));
+                    result.resolve(newval.length);
+                }
+            });
+        };
+        
+        this.COMMANDS['lpop'] = function(si, args, result, dbhandle) {
+            si.prep('get', args[0]).then(function(r) {
+                if (r == undefined) {
+                    // key doesn't exist yet.
+                    var nargs = args.slice(1);
+                    si.prep('set', args[0], JSON.stringify(nargs));
                     result.resolve(undefined);
                 } else {
                     var nargs = args.slice(1);
-                    var prev = JSON.parse(r.value);
+                    var prev = JSON.parse(r);
                     var ret = prev[0];
                     var newval = prev.slice(1);
-                    si.cmd('set', args[0], JSON.stringify(newval));
+                    si.prep('set', args[0], JSON.stringify(newval));
                     result.resolve(ret);
                 }
             });
             dbhandle.resolve();        
         };
         
-        this.COMMANDS['rpop'] = function(si, tx, args, result, dbhandle) {
-            si.cmd('get', args[0]).then(function(r) {
+        this.COMMANDS['rpop'] = function(si, args, result, dbhandle) {
+            si.prep('get', args[0]).then(function(r) {
                 if (r == undefined) {
                     // key doesn't exist yet.
                     var nargs = args.slice(1);
-                    si.cmd('set', args[0], JSON.stringify(nargs));
+                    si.prep('set', args[0], JSON.stringify(nargs));
                     result.resolve(undefined);
                 } else {
                     var nargs = args.slice(1);
-                    var prev = JSON.parse(r.value);
+                    var prev = JSON.parse(r);
                     var ret = prev[prev.length-1];
                     var newval = prev.slice(0,prev.length-1);
-                    si.cmd('set', args[0], JSON.stringify(newval));
+                    si.prep('set', args[0], JSON.stringify(newval));
                     result.resolve(ret);
+                }
+            });
+            dbhandle.resolve();        
+        };
+
+        this.COMMANDS['lindex'] = function(si, args, result, dbhandle) {
+            si.prep('get', args[0]).then(function(r) {
+                if (r == undefined) {
+                    // key doesn't exist yet.
+                    result.resolve(undefined);
+                } else {
+                    var nargs = args.slice(1);
+                    var prev = JSON.parse(r);
+                    var index = args[1];
+                    if (index < 0) {
+                        index = prev.length - index;
+                    }
+                    result.resolve(prev[index]);
                 }
             });
             dbhandle.resolve();        
