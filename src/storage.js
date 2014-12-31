@@ -268,7 +268,13 @@ var SimpleIndex = (function() {
     };
 
     Simple.prototype.close = function() {
+        this.command_queue = [];
+        clearTimeout(this.looper);
         this.db.close();
+    };
+
+    Simple.prototype.all = function(good, bad) {
+        return Promise.all(good, bad);
     };
     
     return Simple;
@@ -362,7 +368,7 @@ var SimpleRedis = (function() {
                     var prev = JSON.parse(r);
                     var index = args[1];
                     if (index < 0) {
-                        index = prev.length - index;
+                        index = prev.length + index;
                     }
                     result.resolve(prev[index]);
                 }

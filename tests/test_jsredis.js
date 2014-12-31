@@ -107,4 +107,21 @@ describe("JSRedis String Functions", function() {
             });
         });
     });
+
+    it("should do stuff", function(done) {
+        conn.all([
+            conn.cmd('rpush', 'mylist', 1),
+            conn.cmd('rpush', 'mylist', 2),
+            conn.cmd('rpush', 'mylist', 3)
+        ]).then(function() {
+            conn.all([
+                conn.cmd('lindex', 'mylist', 2),
+                conn.cmd('lindex', 'mylist', 0),
+                conn.cmd('lindex', 'mylist', -1)
+            ]).then(function(values) {
+                expect(values).toEqual([3,1,3]);
+                done();
+            });
+        });
+    });
 });
