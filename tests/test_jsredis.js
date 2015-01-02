@@ -26,7 +26,60 @@ describe("Simple Index Functions", function() {
 
     it("should be able to test if a key exists.", function(done) {
         conn.exists('test').then(function(exists) {
-            done();
+            expect(exists).toEqual(false);
+            return Next().resolve();
+        }).then(function() {
+            conn.all([
+                conn.set('test', 'value'),
+                conn.exists('test')
+            ]).then(function(values) {
+                expect(values[1]).toEqual(true);
+                done();
+            })
+        });
+    });
+
+    it("should provide a delete function that works.", function(done) {
+        conn.exists('key').then(function(exists) {
+            expect(exists).toEqual(false);
+            return Next().resolve();
+        }).then(function() {
+            return conn.set('key','value');            
+        }).then(function() {
+            return conn.get('key')
+        }).then(function() {
+            return conn.del('key');
+        }).then(function() {
+            conn.get('key').then(function(value) {
+                expect(value).toEqual(undefined);
+                done();
+            });
+        });
+    });
+
+    it("should provide a keys method that returns a list of all keys", function(done) {
+        conn.all([
+            conn.set('key1', 1),
+            conn.set('key2', 2),
+            conn.set('key3', 3),
+            conn.set('key4', 4)
+        ]).then(function() {
+            return conn.keys().then(function(values) {
+                expect(values.indexOf('key1')).toBeGreaterThan(-1);
+                expect(values.indexOf('key2')).toBeGreaterThan(-1);
+                expect(values.indexOf('key3')).toBeGreaterThan(-1);
+                expect(values.indexOf('key4')).toBeGreaterThan(-1);
+            });
+        }).then(function() {
+            return conn.del('key2');
+        }).then(function() {
+            return conn.keys().then(function(values) {
+                expect(values.indexOf('key1')).toBeGreaterThan(-1);
+                expect(values.indexOf('key2')).toEqual(-1);
+                expect(values.indexOf('key3')).toBeGreaterThan(-1);
+                expect(values.indexOf('key4')).toBeGreaterThan(-1);
+                done();
+            });
         });
     });
 });

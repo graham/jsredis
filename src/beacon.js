@@ -154,16 +154,19 @@ var PromiseValue = function() {
 
 PromiseValue.prototype.then = function(good, bad) {
     this.internal_promise.then(good, bad);
+    return this;
 };
 
 PromiseValue.prototype.resolve = function(value) {
     this.resolve(value);
     this._the_value = value;
+    return this;
 };
 
 PromiseValue.prototype.reject = function(err) {
     this.reject(err);
     this._the_value = 'error';
+    return this;
 };
 
 var Next = function() {

@@ -3,7 +3,7 @@ var l = function() {
 }
 
 var SimpleIndex = (function() {
-    var TIMEOUT_MS = 3;
+    var TIMEOUT_MS = 0;
 
     var CORE_COMMANDS = {};
     CORE_COMMANDS['get'] = function(si, args, result, dbhandle) {
@@ -81,6 +81,65 @@ var SimpleIndex = (function() {
             dbhandle.resolve();
         };
     };
+
+    CORE_COMMANDS['del'] = function(si, args, result, dbhandle) {
+        var tx = si.db.transaction('keys', 'readwrite');
+        var key = args[0];
+
+        var store = tx.objectStore("keys");
+        var index = store.index("by_key");
+        var request = index.openCursor(IDBKeyRange.only(key));
+        
+        request.onsuccess = function() {
+            var cursor = request.result;
+            
+            if (cursor) {
+                store.delete(key);
+                result.resolve(true);
+                dbhandle.resolve();
+            } else {
+                store.del(key);
+                tx.oncomplete = function() {
+                    result.resolve(false);
+                    dbhandle.resolve();
+                };
+            }
+        };
+        
+        request.onerror = function() {
+            result.reject(key);
+            dbhandle.resolve();
+        };
+    };
+
+    
+    CORE_COMMANDS['keys'] = function(si, args, result, dbhandle) {
+        var tx = si.db.transaction('keys', 'readwrite');
+
+        var store = tx.objectStore("keys");
+        var index = store.index("by_key");
+        var request = index.openCursor();
+
+        var collector = [];
+        
+        request.onsuccess = function() {
+            var cursor = request.result;
+            
+            if (cursor) {
+                collector.push(cursor.key);
+                cursor.continue();
+            } else {
+                result.resolve(collector);
+                dbhandle.resolve();
+            }
+        };
+        
+        request.onerror = function() {
+            result.reject(key);
+            dbhandle.resolve();
+        };
+    };
+
     
     var Simple = function(name) {
         this.name = name;
