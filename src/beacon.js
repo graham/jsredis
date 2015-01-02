@@ -111,23 +111,61 @@ var Beacon = (function() {
     return Beacon;
 })();
 
-var PromiseValue = function() {
-        var _this = this;
-        this.internal_promise = new Promise(function(resolve, reject) {
-            _this.resolve = resolve;
-            _this.reject = reject;
-        });
-    };
+var InterruptTimer = function(callback, timeout) {
+    this.callback = callback;
+    this.timeout = timeout;
+    this.timeout_id = null;
+    this.has_called = false;
+};
 
-PromiseValue.prototype.then = function(fun) {
-    this.internal_promise.then(fun);
+InterruptTimer.prototype.start = function() {
+    var _this = this;
+    if (this.timeout > 0) {
+        this.timeout_id = setTimeout(function() { _this.cancel(); }, this.timeout);
+    }        
+};
+
+InterruptTimer.prototype.cancel = function() {
+    if (this.has_called) {
+        return
+    }
+    this.has_called = true;
+    clearTimeout(this.timeout_id);
+    this.callback(undefined);
+};
+
+InterruptTimer.prototype.fire = function(value) {
+    if (this.has_called) {
+        return
+    }
+    this.has_called = true;
+    clearTimeout(this.timeout_id);
+    this.callback(value);
+};
+
+var PromiseValue = function() {
+    var _this = this;
+    var _the_value = null;
+    this.internal_promise = new Promise(function(resolve, reject) {
+        _this.resolve = resolve;
+        _this.reject = reject;
+    });
+};
+
+PromiseValue.prototype.then = function(good, bad) {
+    this.internal_promise.then(good, bad);
 };
 
 PromiseValue.prototype.resolve = function(value) {
     this.resolve(value);
+    this._the_value = value;
 };
 
 PromiseValue.prototype.reject = function(err) {
     this.reject(err);
+    this._the_value = 'error';
 };
 
+var Next = function() {
+    return new PromiseValue();
+};

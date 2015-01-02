@@ -125,8 +125,137 @@ describe("JSRedis String Functions", function() {
         });
     });
 
-    it("should support lrem.", function(done) {
-        expect(false).toEqual(true);
+    it("lrem all.", function(done) {
+        conn.all([
+            conn.cmd('rpush', 'mylist', 1),
+            conn.cmd('rpush', 'mylist', 2),
+            conn.cmd('rpush', 'mylist', 3),
+            conn.cmd('rpush', 'mylist', 1),
+            conn.cmd('rpush', 'mylist', 1)
+        ]).then(function() {
+            var n = Next();
+
+            conn.cmd('lrem', 'mylist', 0, 1).then(function() {
+                n.resolve();
+            });
+
+            return n;
+        }).then(function() {
+            conn.cmd('get', 'mylist').then(function(value) {
+                expect(value).toEqual('[2,3]');
+                done();
+            });
+        });
+    });
+
+    it("lrem some.", function(done) {
+        conn.all([
+            conn.cmd('rpush', 'mylist', 'hello'),
+            conn.cmd('rpush', 'mylist', 'world'),
+            conn.cmd('rpush', 'mylist', 'hello'),            
+            conn.cmd('rpush', 'mylist', 'good'),
+            conn.cmd('rpush', 'mylist', 'hello'),
+            conn.cmd('rpush', 'mylist', 'hello')
+        ]).then(function() {
+            var n = Next();
+
+            conn.cmd('lrem', 'mylist', 1, 'hello').then(function() {
+                n.resolve();
+            });
+
+            return n;
+        }).then(function() {
+            var n = Next();
+            
+            conn.cmd('get', 'mylist').then(function(value) {
+                expect(value).toEqual('["world","hello","good","hello","hello"]');
+                n.resolve();
+            });
+
+            return n;
+        }).then(function() {
+            var n = Next();
+
+            conn.cmd('lrem', 'mylist', -1, 'hello').then(function() {
+                conn.cmd('get', 'mylist').then(function(value) {
+                    expect(value).toEqual('["world","hello","good","hello"]');
+                    n.resolve();
+                });
+            });
+            
+            return n;
+        }).then(function() {
+            done();
+        });
+    });
+
+});
+
+describe("InterruptTimer tests", function() {
+    it("timeouts should work.", function(done) {
+        var did_fire = null;
+        var did_timeout = null;
+
+        var do_fire = function(value) {
+            if (value == undefined) {
+                did_timeout = true;
+            } else {
+                did_fire = true;
+            }
+        }
+        
+        var one = new InterruptTimer(do_fire, 1);
+        one.start();
+        
+        setTimeout(function() {
+            expect(did_timeout).toEqual(true);
+            done();
+        }, 100);
+    });
+
+    it("Make sure value calls correctly if the fire method is called.", function(done) {
+        var did_fire = null;
+        var did_timeout = null;
+        var do_fire = function(value) {
+            if (value == undefined) {
+                did_timeout = true;
+            } else {
+                did_fire = true;
+            }
+        }
+        
+        var one = new InterruptTimer(do_fire, 100);
+        one.start();
+
+        setTimeout(function() {
+            one.fire('boom');
+        }, 10);
+        
+        setTimeout(function() {
+            expect(did_fire).toEqual(true);
+            done();
+        }, 50);
+    });
+
+    it("ensure only one method gets called.", function(done) {
+        var did_fire = null;
+        var did_timeout = null;
+        var do_fire = function(value) {
+            if (value == undefined) {
+                did_timeout = true;
+            } else {
+                did_fire = true;
+            }
+        }
+        
+        var one = new InterruptTimer(do_fire, 10);
+        one.start();
+        one.fire('asdf');
+        one.cancel();
+
+        expect(did_fire).toEqual(true);
+        expect(did_timeout).toEqual(null);
         done();
     });
+
 });

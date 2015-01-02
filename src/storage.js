@@ -3,30 +3,7 @@ var l = function() {
 }
 
 var SimpleIndex = (function() {
-    var TIMEOUT_MS = 1;
-    
-    var PromiseValue = function() {
-        var _this = this;
-        var _the_value = null;
-        this.internal_promise = new Promise(function(resolve, reject) {
-            _this.resolve = resolve;
-            _this.reject = reject;
-        });
-    };
-
-    PromiseValue.prototype.then = function(good, bad) {
-        this.internal_promise.then(good, bad);
-    };
-    
-    PromiseValue.prototype.resolve = function(value) {
-        this.resolve(value);
-        this._the_value = value;
-    };
-    
-    PromiseValue.prototype.reject = function(err) {
-        this.reject(err);
-        this._the_value = 'error';
-    };
+    var TIMEOUT_MS = 3;
 
     var CORE_COMMANDS = {};
     CORE_COMMANDS['get'] = function(si, args, result, dbhandle) {
@@ -139,14 +116,14 @@ var SimpleIndex = (function() {
                 var keyIndex = store.createIndex("by_key", "key", {unique:true});
 
                 _this.db = db;
-                console.log("Simple Database created.");
+                //console.log("Simple Database created.");
                 setTimeout(resolve, TIMEOUT_MS);
             };
             
             // We've successfully connected to the database, because it already
             // existed and we can just start working.
             db_hook.onsuccess = function() {
-                console.log('Connected to database.');
+                //console.log('Connected to database.');
                 _this.db = db_hook.result;
                 setTimeout(resolve, TIMEOUT_MS);
             };
@@ -213,7 +190,7 @@ var SimpleIndex = (function() {
                 var req = indexedDB.deleteDatabase( _this.name );
             
                 req.onsuccess = function () {
-                    console.log('reset successful.');
+                    //console.log('reset successful.');
                     setTimeout(resolve, TIMEOUT_MS);
                 };
                 req.onerror = function () {
@@ -371,6 +348,74 @@ var SimpleRedis = (function() {
                         index = prev.length + index;
                     }
                     result.resolve(prev[index]);
+                }
+            });
+            dbhandle.resolve();        
+        };
+
+        this.COMMANDS['lrem'] = function(si, args, result, dbhandle) {
+            si.prep('get', args[0]).then(function(r) {
+                if (r == undefined) {
+                    // key doesn't exist yet.
+                    result.resolve(undefined);
+                } else {
+                    var nargs = args.slice(1);
+                    var prev = JSON.parse(r);
+                    var newval = [];
+                    var count = nargs[0];
+                    var check = nargs[1];
+
+                    if (count > 0) {
+                        for(var i=0; i < prev.length; i++) {
+                            var match = false;
+                            if (check == prev[i]) {
+                                match = true;
+                            }
+
+                            if (match) {
+                                if (count == 0) {
+                                    newval.push(prev[i]);
+                                } else {
+                                    count -= 1;
+                                }                                    
+                            } else {
+                                newval.push(prev[i]);
+                            }
+                        }
+                    } else if (count < 0) {
+                        for(var i=prev.length-1; i >= 0; i--) {
+                            var match = false;
+                            if (check == prev[i]) {
+                                match = true;
+                            }
+
+                            if (match) {
+                                if (count == 0) {
+                                    newval.push(prev[i]);
+                                } else {
+                                    count += 1;
+                                }                                    
+                            } else {
+                                newval.push(prev[i]);
+                            }
+                        }
+
+                        newval.reverse();
+                    } else if (count == 0) {
+                        for(var i=0; i < prev.length; i++) {
+                            var match = false;
+                            if (check == prev[i]) {
+                                match = true;
+                            }
+                            
+                            if (!match) {
+                                newval.push(prev[i]);
+                            }
+                        }
+                    }
+
+                    si.prep('set', args[0], JSON.stringify(newval));
+                    result.resolve(count);
                 }
             });
             dbhandle.resolve();        
