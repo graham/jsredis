@@ -14,6 +14,7 @@ Internally it will likely change over time, and won't be nearly as optimized ( h
 Task list, only completed if there is a test that passes :)
 
 Simple KV Interface for IndexedDB:
+
    - [x] get
    - [x] set
    - [x] reset db
@@ -24,15 +25,18 @@ Simple KV Interface for IndexedDB:
    - [ ] transactions
    - [ ] db lock (for multiple tabs).
 
-Commands to implement:
-   Keys:
+Redis Commands:
+
+Keys:
+
      - [ ] expire
      - [ ] presist
      - [ ] rename
      - [ ] type
      - [ ] renamenx
 
-   Lists:
+Lists:
+
      - [ ] blpop
      - [ ] brpop
      - [ ] brpoplpush
