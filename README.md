@@ -27,7 +27,7 @@ Simple KV Interface for IndexedDB:
 
 Redis Commands:
 
-Keys:
+All Keys:
 
    - [ ] expire
    - [ ] presist
@@ -47,10 +47,73 @@ Lists:
    - [x] lpush
    - [ ] lpushx
    - [ ] lrange
-   - [ ] lrem
+   - [-] lrem
    - [ ] lset
    - [ ] ltrim
    - [ ] rpop
    - [ ] rpoplpush
    - [x] rpush
    - [ ] rpushx
+
+Sets:
+
+   - [ ] sadd
+   - [ ] scard
+   - [ ] sdiff
+   - [ ] sdiffstore
+   - [ ] sinter
+   - [ ] sinterstore
+   - [ ] sismember
+   - [ ] smembers
+   - [ ] smove
+   - [ ] spop
+   - [ ] srandmember
+   - [ ] srem
+   - [ ] sunion
+   - [ ] sunionstore
+   - [ ] sscan
+
+Strings:
+
+   - [ ] append
+   - [ ] bitcount
+   - [ ] bitop
+   - [ ] bitpos
+   - [ ] decr
+   - [ ] decrby
+   - [x] get
+   - [ ] getbit
+   - [ ] getrange
+   - [ ] getset
+   - [ ] incr
+   - [ ] incrby
+   - [ ] incrbyfloat
+   - [ ] mget
+   - [ ] mset
+   - [ ] msetnx
+   - [ ] psetex
+   - [x] set
+   - [ ] setbit
+   - [ ] setex
+   - [ ] setnx
+   - [ ] setrange
+   - [ ] strlen
+
+Hashes:
+
+   - [ ] hdel
+   - [ ] hexists
+   - [ ] hget
+   - [ ] hgetall
+   - [ ] hincrby
+   - [ ] hincrbyfloat
+   - [ ] hkeys
+   - [ ] hlen
+   - [ ] hmget
+   - [ ] hmset
+   - [ ] hset
+   - [ ] hsetnx
+   - [ ] hvals
+   - [ ] hscan
+
+SortedSets, HyperLogLog, Pub/Sub, Transactions, Scripting, Server: Soon. :)

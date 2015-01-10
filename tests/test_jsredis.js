@@ -123,7 +123,7 @@ describe("JSRedis String Functions", function() {
         });
     });
 
-    it("should handle pop and push together.", function(done) {
+    it("lpop and rpop; pop off both sides of a list.", function(done) {
         Promise.all([
             conn.cmd('rpush', 'mylist', 1),
             conn.cmd('rpush', 'mylist', 2),
@@ -138,7 +138,7 @@ describe("JSRedis String Functions", function() {
                     conn.cmd('lpop', 'mylist'),
                     conn.cmd('rpush', 'mylist', 4),
                     conn.cmd('lpop', 'mylist'),
-                    conn.cmd('lpop', 'mylist')                    
+                    conn.cmd('lpop', 'mylist')               
                 ]).then(function(values) {
                     // this is a little hard to read,
                     // the first two are the values,
@@ -146,7 +146,18 @@ describe("JSRedis String Functions", function() {
                     // 4 is appended [3,4].
                     // [3,4] are the last 2 values.
                     expect(values).toEqual([1,2,2,3,4]);
-                    done();
+                    return Next().resolve();
+                }).then(function() {
+                    return conn.all([
+                        conn.cmd('rpush', 'mylist', 'a'),
+                        conn.cmd('rpush', 'mylist', 'b'),
+                        conn.cmd('lpush', 'mylist', 'A')
+                    ]);
+                }).then(function() {
+                    conn.cmd('rpop', 'mylist').then(function(value) {
+                        expect(value).toEqual('b');
+                        done();
+                    });
                 });
             });
         });
