@@ -29,28 +29,28 @@ Redis Commands:
 
 Keys:
 
-     - [ ] expire
-     - [ ] presist
-     - [ ] rename
-     - [ ] type
-     - [ ] renamenx
+   - [ ] expire
+   - [ ] presist
+   - [ ] rename
+   - [ ] type
+   - [ ] renamenx
 
 Lists:
 
-     - [ ] blpop
-     - [ ] brpop
-     - [ ] brpoplpush
-     - [x] lindex
-     - [ ] linsert
-     - [ ] llen
-     - [ ] lpop
-     - [x] lpush
-     - [ ] lpushx
-     - [ ] lrange
-     - [ ] lrem
-     - [ ] lset
-     - [ ] ltrim
-     - [ ] rpop
-     - [ ] rpoplpush
-     - [x] rpush
-     - [ ] rpushx
+   - [ ] blpop
+   - [ ] brpop
+   - [ ] brpoplpush
+   - [x] lindex
+   - [ ] linsert
+   - [ ] llen
+   - [ ] lpop
+   - [x] lpush
+   - [ ] lpushx
+   - [ ] lrange
+   - [ ] lrem
+   - [ ] lset
+   - [ ] ltrim
+   - [ ] rpop
+   - [ ] rpoplpush
+   - [x] rpush
+   - [ ] rpushx
