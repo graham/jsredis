@@ -11,10 +11,42 @@ I like Redis, I like the commands, I thinks it's pretty easy to map large amount
 
 Internally it will likely change over time, and won't be nearly as optimized ( http://redis.io/topics/memory-optimization ) but it should provide you with the functionality.
 
+Task list, only completed if there is a test that passes :)
 
-** Todo
-   - I haven't even started PUBSUB yet.
-   - A Mutex will be required if two browser windows receive data to write to the db at the same time. I'm still working on how this should work.
+Simple KV Interface for IndexedDB:
+   - [x] get
+   - [x] set
+   - [x] reset db
+   - [x] exists
+   - [x] keys
+   - [x] batch commands
+   - [x] del
+   - [ ] transactions
+   - [ ] db lock (for multiple tabs).
 
+Commands to implement:
+   Keys:
+     - [ ] expire
+     - [ ] presist
+     - [ ] rename
+     - [ ] type
+     - [ ] renamenx
 
-   - [ ] lpush
+   Lists:
+     - [ ] blpop
+     - [ ] brpop
+     - [ ] brpoplpush
+     - [x] lindex
+     - [ ] linsert
+     - [ ] llen
+     - [ ] lpop
+     - [x] lpush
+     - [ ] lpushx
+     - [ ] lrange
+     - [ ] lrem
+     - [ ] lset
+     - [ ] ltrim
+     - [ ] rpop
+     - [ ] rpoplpush
+     - [x] rpush
+     - [ ] rpushx

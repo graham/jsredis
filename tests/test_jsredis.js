@@ -15,7 +15,7 @@ describe("Simple Index Functions", function() {
         });            
     });
 
-    it("should have get/set methods that work.", function(done) {
+    it("get and set; should be able to get and set keys.", function(done) {
         conn.set('test', 'value').then(function() {
             conn.get('test').then(function(value) {
                 expect(value).toEqual('value');
@@ -24,7 +24,7 @@ describe("Simple Index Functions", function() {
         });
     });
 
-    it("should be able to test if a key exists.", function(done) {
+    it("exists; check if key exists.", function(done) {
         conn.exists('test').then(function(exists) {
             expect(exists).toEqual(false);
             return Next().resolve();
@@ -39,7 +39,7 @@ describe("Simple Index Functions", function() {
         });
     });
 
-    it("should provide a delete function that works.", function(done) {
+    it("del; can delete keys.", function(done) {
         conn.exists('key').then(function(exists) {
             expect(exists).toEqual(false);
             return Next().resolve();
@@ -57,7 +57,7 @@ describe("Simple Index Functions", function() {
         });
     });
 
-    it("should provide a keys method that returns a list of all keys", function(done) {
+    it("keys; return list of all keys in db.", function(done) {
         conn.all([
             conn.set('key1', 1),
             conn.set('key2', 2),
@@ -99,23 +99,14 @@ describe("JSRedis String Functions", function() {
         });
     });
 
-    it("get/set should work.", function(done) {
+    it("get and set; get and set keys.", function(done) {
         conn.set('test', 'aweso').then(function(data) {
             expect(data).toEqual('aweso');
             done();
         });
     });
 
-    it("should get multiple values, even if they don't exist.", function(done) {
-        conn.set('one', 111);
-        conn.set('two', '222');
-        conn.get('two').then(function(data) {
-            expect(data).toEqual('222');
-            done();
-        });
-    });
-
-    it("should support lpush, rpush", function(done) {
+    it("lpush and rpush; append and prepend to a list.", function(done) {
         conn.exists('mylist').then(function(result) {
             expect(result).toEqual(false);
 
