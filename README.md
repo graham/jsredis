@@ -15,3 +15,6 @@ Internally it will likely change over time, and won't be nearly as optimized ( h
 ** Todo
    - I haven't even started PUBSUB yet.
    - A Mutex will be required if two browser windows receive data to write to the db at the same time. I'm still working on how this should work.
+
+
+   - [ ] lpush
