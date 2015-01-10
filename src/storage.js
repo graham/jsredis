@@ -82,6 +82,37 @@ var SimpleIndex = (function() {
         };
     };
 
+    CORE_COMMANDS['setnx'] = function(si, args, result, dbhandle) {
+        var tx = si.db.transaction('keys', 'readwrite');
+        var key = args[0];
+        var value = args[1];
+
+        var store = tx.objectStore("keys");
+        var index = store.index("by_key");
+        var request = index.openCursor(IDBKeyRange.only(key));
+        
+        request.onsuccess = function() {
+            var cursor = request.result;
+            var new_value = {'key':key, 'value':value, 'type':value.constructor.name};
+            
+            if (cursor) {
+                result.resolve(0);
+                dbhandle.resolve();
+            } else {
+                store.put(new_value)
+                tx.oncomplete = function() {
+                    result.resolve(1);
+                    dbhandle.resolve();
+                };
+            }
+        };
+        
+        request.onerror = function() {
+            result.reject(key);
+            dbhandle.resolve();
+        };
+    };
+
     CORE_COMMANDS['del'] = function(si, args, result, dbhandle) {
         var tx = si.db.transaction('keys', 'readwrite');
         var key = args[0];

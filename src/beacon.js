@@ -153,20 +153,17 @@ var PromiseValue = function() {
 };
 
 PromiseValue.prototype.then = function(good, bad) {
-    this.internal_promise.then(good, bad);
-    return this;
+    return this.internal_promise.then(good, bad);
 };
 
 PromiseValue.prototype.resolve = function(value) {
-    this.resolve(value);
     this._the_value = value;
-    return this;
+    return this.resolve(value);
 };
 
 PromiseValue.prototype.reject = function(err) {
-    this.reject(err);
     this._the_value = 'error';
-    return this;
+    return this.reject(err);
 };
 
 var Next = function() {

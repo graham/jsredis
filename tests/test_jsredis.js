@@ -244,6 +244,23 @@ describe("JSRedis String Functions", function() {
         });
     });
 
+    it("setnx; like set, but fails if key already exists.", function(done) {
+        conn.cmd('setnx', 'key', 'value').then(function(value) {
+            expect(value).toEqual(1);
+            return conn.cmd('get', 'key');
+        }).then(function(value) {
+            expect(value).toEqual('value');
+            return conn.all([
+                conn.cmd('setnx', 'key', 'newvalue'),
+                conn.cmd('get', 'key')
+            ]);
+        }).then(function(values) {
+            expect(values[0]).toEqual(0);
+            expect(values[1]).toEqual('value');
+            done();
+        });
+    });
+
 });
 
 describe("InterruptTimer tests", function() {

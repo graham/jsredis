@@ -47,7 +47,7 @@ Lists:
    - [x] lpush
    - [ ] lpushx
    - [ ] lrange
-   - [-] lrem
+   - [ ] lrem
    - [ ] lset
    - [ ] ltrim
    - [ ] rpop
@@ -95,7 +95,7 @@ Strings:
    - [x] set
    - [ ] setbit
    - [ ] setex
-   - [ ] setnx
+   - [x] setnx
    - [ ] setrange
    - [ ] strlen
 
