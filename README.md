@@ -42,12 +42,12 @@ Lists:
    - [ ] brpoplpush
    - [x] lindex
    - [ ] linsert
-   - [ ] llen
+   - [x] llen
    - [ ] lpop
    - [x] lpush
    - [ ] lpushx
    - [ ] lrange
-   - [ ] lrem
+   - [x] lrem
    - [ ] lset
    - [ ] ltrim
    - [ ] rpop

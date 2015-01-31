@@ -4,6 +4,7 @@ var l = function() {
 
 var SimpleIndex = (function() {
     var TIMEOUT_MS = 0;
+    var TIMEOUT_MS_BIG = 0;
 
     var CORE_COMMANDS = {};
     CORE_COMMANDS['get'] = function(si, args, result, dbhandle) {
@@ -71,37 +72,6 @@ var SimpleIndex = (function() {
                 store.put(new_value)
                 tx.oncomplete = function() {
                     result.resolve(value);
-                    dbhandle.resolve();
-                };
-            }
-        };
-        
-        request.onerror = function() {
-            result.reject(key);
-            dbhandle.resolve();
-        };
-    };
-
-    CORE_COMMANDS['setnx'] = function(si, args, result, dbhandle) {
-        var tx = si.db.transaction('keys', 'readwrite');
-        var key = args[0];
-        var value = args[1];
-
-        var store = tx.objectStore("keys");
-        var index = store.index("by_key");
-        var request = index.openCursor(IDBKeyRange.only(key));
-        
-        request.onsuccess = function() {
-            var cursor = request.result;
-            var new_value = {'key':key, 'value':value, 'type':value.constructor.name};
-            
-            if (cursor) {
-                result.resolve(0);
-                dbhandle.resolve();
-            } else {
-                store.put(new_value)
-                tx.oncomplete = function() {
-                    result.resolve(1);
                     dbhandle.resolve();
                 };
             }
@@ -188,7 +158,7 @@ var SimpleIndex = (function() {
         var _this = this;
         
         if (this.db) {
-            this.db.close();
+            this.close();
         }
         
         this.db = null;
@@ -216,6 +186,7 @@ var SimpleIndex = (function() {
                 //console.log('Connected to database.');
                 _this.db = db_hook.result;
                 setTimeout(resolve, TIMEOUT_MS);
+                //_this.process();
             };
             
             db_hook.onerror = function() {
@@ -231,7 +202,7 @@ var SimpleIndex = (function() {
         var result = new PromiseValue();
         this.command_queue.push([newargs[0], newargs.slice(1), result]);
         this.process();
-        return result;
+        return result.internal_promise;
     };
 
     Simple.prototype.prep = function() {
@@ -239,7 +210,7 @@ var SimpleIndex = (function() {
         var result = new PromiseValue();
         this.command_queue = [[newargs[0], newargs.slice(1), result]].concat(this.command_queue);
         this.process();
-        return result;
+        return result.internal_promise;
     };
     
     Simple.prototype.get = function(key) {
@@ -262,18 +233,19 @@ var SimpleIndex = (function() {
         return this.cmd('keys', match);
     };
 
-    Simple.prototype.reset_all_data = function() {
-        var _this = this;
-        
-        if (this.db) { this.db.close(); }
-        
-        this.db = null;
+    Simple.prototype.reset_all_data = function(count) {
+        this.command_queue = [];
         if (this.looper) {
             clearTimeout(this.looper);
         }
         this.looper = null;
-        this.command_queue = [];
         
+        if (count == undefined) { count = 1; }
+        var _this = this;
+        
+        if (this.db) { this.close(); }
+        
+        this.db = null;
 
         return new Promise(function(resolve, reject) {
             setTimeout(function() {
@@ -288,10 +260,15 @@ var SimpleIndex = (function() {
                     setTimeout(reject, TIMEOUT_MS);
                 };
                 req.onblocked = function () {
-                    console.log('reset blocked')                
-                    setTimeout(reject, TIMEOUT_MS);
+                    console.log(this);
+                    console.log('reset blocked');
+                    if (count > 10) {
+                        setTimeout(reject, TIMEOUT_MS);
+                    } else {
+                        setTimeout(function() { _this.reset_all_data(count+1); }, TIMEOUT_MS_BIG);
+                    }
                 };
-            }, TIMEOUT_MS);
+            }, TIMEOUT_MS+1);
         });
     };
 
@@ -328,6 +305,9 @@ var SimpleIndex = (function() {
     };
 
     Simple.prototype.process = function() {
+        if (this.db == null) {
+            return;
+        }
         var _this = this;
         if (this.looper == null) {
             this.looper = setTimeout(function() { _this.consume_queue(); }, TIMEOUT_MS);
@@ -337,7 +317,10 @@ var SimpleIndex = (function() {
     Simple.prototype.close = function() {
         this.command_queue = [];
         clearTimeout(this.looper);
-        this.db.close();
+        if (this.db) {
+            this.db.close();
+            this.db = null;
+        }
     };
 
     Simple.prototype.all = function(good, bad) {
@@ -350,9 +333,39 @@ var SimpleIndex = (function() {
 var SimpleRedis = (function() {
     var SimpleRedisCore = function(name) {
         this.name = name;
-        
+
+        this.COMMANDS['setnx'] = function(si, args, result, dbhandle) {
+            var tx = si.db.transaction('keys', 'readwrite');
+            var key = args[0];
+            var value = args[1];
+            
+            var store = tx.objectStore("keys");
+            var index = store.index("by_key");
+            var request = index.openCursor(IDBKeyRange.only(key));
+            
+            request.onsuccess = function() {
+                var cursor = request.result;
+                var new_value = {'key':key, 'value':value, 'type':value.constructor.name};
+                
+                if (cursor) {
+                    result.resolve(0);
+                    dbhandle.resolve();
+                } else {
+                    store.put(new_value)
+                    tx.oncomplete = function() {
+                        result.resolve(1);
+                        dbhandle.resolve();
+                    };
+                }
+            };
+            
+            request.onerror = function() {
+                result.reject(key);
+                dbhandle.resolve();
+            };
+        };
+
         this.COMMANDS['rpush'] = function(si, args, result, dbhandle) {
-            dbhandle.resolve();
             si.prep('get', args[0]).then(function(r) {
                 if (r == undefined) {
                     // key doesn't exist yet.
@@ -367,10 +380,10 @@ var SimpleRedis = (function() {
                     result.resolve(newval.length);
                 }
             });
+            dbhandle.resolve();
         };
         
         this.COMMANDS['lpush'] = function(si, args, result, dbhandle) {
-            dbhandle.resolve();
             si.prep('get', args[0]).then(function(r) {
                 if (r == undefined) {
                     // key doesn't exist yet.
@@ -385,6 +398,7 @@ var SimpleRedis = (function() {
                     result.resolve(newval.length);
                 }
             });
+            dbhandle.resolve();
         };
         
         this.COMMANDS['lpop'] = function(si, args, result, dbhandle) {
@@ -506,6 +520,20 @@ var SimpleRedis = (function() {
 
                     si.prep('set', args[0], JSON.stringify(newval));
                     result.resolve(count);
+                }
+            });
+            dbhandle.resolve();        
+        };
+        
+        this.COMMANDS['llen'] = function(si, args, result, dbhandle) {
+            si.prep('get', args[0]).then(function(r) {
+                if (r == undefined) {
+                    // key doesn't exist yet.
+                    result.resolve(undefined);
+                } else {
+                    var nargs = args.slice(1);
+                    var prev = JSON.parse(r);
+                    result.resolve(prev.length);
                 }
             });
             dbhandle.resolve();        

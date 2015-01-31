@@ -1,18 +1,30 @@
 var conn = null;
 
+// from: http://stackoverflow.com/questions/105034/create-guid-uuid-in-javascript
+function generateUUID(){
+    var d = new Date().getTime();
+    var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = (d + Math.random()*16)%16 | 0;
+        d = Math.floor(d/16);
+        return (c=='x' ? r : (r&0x3|0x8)).toString(16);
+    });
+    return uuid;
+};
+
 describe("Simple Index Functions", function() {
     beforeEach(function(done) {
-        if (conn) {
-            conn.close();
-        }
-        conn = new SimpleIndex('simple-index-test-suite');
-        conn.reset_all_data().then(function() {
-            conn.init_db().then(function() {
-                conn.ready.then(function() {
-                    done();
-                });
-            });
+        conn = new SimpleIndex(generateUUID());
+        conn.init_db();
+        conn.ready.then(function() {
+            done();
         });            
+    });
+
+    afterEach(function(done) {
+        conn.close();
+        conn.reset_all_data().then(function() {
+            setTimeout(done, 100);
+        });
     });
 
     it("get and set; should be able to get and set keys.", function(done) {
@@ -86,16 +98,16 @@ describe("Simple Index Functions", function() {
 
 describe("JSRedis String Functions", function() {
     beforeEach(function(done) {
-        if (conn) {
-            conn.close();
-        }
-        conn = new SimpleRedis('redis-index-test-suite');
+        conn = new SimpleRedis(generateUUID());
+        conn.init_db();        
+        conn.ready.then(function() {
+            done();
+        });            
+    });
+
+    afterEach(function(done) {
         conn.reset_all_data().then(function() {
-            conn.init_db().then(function() {
-                conn.ready.then(function() {
-                    done();
-                });
-            });
+            done();
         });
     });
 
@@ -261,9 +273,36 @@ describe("JSRedis String Functions", function() {
         });
     });
 
+    it("llen; returns the length of a list.", function(done) {
+        conn.all([
+            conn.cmd('rpush', 'key', 1),
+            conn.cmd('rpush', 'key', 2),
+            conn.cmd('rpush', 'key', 3)
+        ]).then(function(results) {
+            return conn.cmd('llen', 'key');
+        }).then(function(length) {
+            expect(length).toEqual(3);
+            done();
+        });
+    });
+
 });
 
 describe("InterruptTimer tests", function() {
+    beforeEach(function(done) {
+        conn = new SimpleRedis(generateUUID());
+        conn.init_db();        
+        conn.ready.then(function() {
+            done();
+        });            
+    });
+
+    afterEach(function(done) {
+        conn.reset_all_data().then(function() {
+            done();
+        });
+    });
+
     it("timeouts should work.", function(done) {
         var did_fire = null;
         var did_timeout = null;
