@@ -11,6 +11,89 @@ function generateUUID(){
     return uuid;
 };
 
+describe("InterruptTimer tests", function() {
+    beforeEach(function(done) {
+        conn = new SimpleRedis(generateUUID());
+        conn.init_db();        
+        conn.ready.then(function() {
+            done();
+        });            
+    });
+
+    afterEach(function(done) {
+        conn.reset_all_data().then(function() {
+            done();
+        });
+    });
+
+    it("timeouts should work.", function(done) {
+        var did_fire = null;
+        var did_timeout = null;
+
+        var do_fire = function(value) {
+            if (value == undefined) {
+                did_timeout = true;
+            } else {
+                did_fire = true;
+            }
+        }
+        
+        var one = new InterruptTimer(do_fire, 1);
+        one.start();
+        
+        setTimeout(function() {
+            expect(did_timeout).toEqual(true);
+            done();
+        }, 100);
+    });
+
+    it("Make sure value calls correctly if the fire method is called.", function(done) {
+        var did_fire = null;
+        var did_timeout = null;
+        var do_fire = function(value) {
+            if (value == undefined) {
+                did_timeout = true;
+            } else {
+                did_fire = true;
+            }
+        }
+        
+        var one = new InterruptTimer(do_fire, 100);
+        one.start();
+
+        setTimeout(function() {
+            one.fire('boom');
+        }, 10);
+        
+        setTimeout(function() {
+            expect(did_fire).toEqual(true);
+            done();
+        }, 50);
+    });
+
+    it("ensure only one method gets called.", function(done) {
+        var did_fire = null;
+        var did_timeout = null;
+        var do_fire = function(value) {
+            if (value == undefined) {
+                did_timeout = true;
+            } else {
+                did_fire = true;
+            }
+        }
+        
+        var one = new InterruptTimer(do_fire, 10);
+        one.start();
+        one.fire('asdf');
+        one.cancel();
+
+        expect(did_fire).toEqual(true);
+        expect(did_timeout).toEqual(null);
+        done();
+    });
+
+});
+
 describe("Simple Index Functions", function() {
     beforeEach(function(done) {
         conn = new SimpleIndex(generateUUID());
@@ -286,87 +369,37 @@ describe("JSRedis String Functions", function() {
         });
     });
 
-});
-
-describe("InterruptTimer tests", function() {
-    beforeEach(function(done) {
-        conn = new SimpleRedis(generateUUID());
-        conn.init_db();        
-        conn.ready.then(function() {
-            done();
-        });            
-    });
-
-    afterEach(function(done) {
-        conn.reset_all_data().then(function() {
+    it("lrange; gets a slice of a list.", function(done) {
+        conn.all([
+            conn.cmd('rpush', 'key', 1),
+            conn.cmd('rpush', 'key', 2),
+            conn.cmd('rpush', 'key', 3)
+        ]).then(function(results) {
+            return conn.all([
+                conn.cmd('lrange', 'key', 0, -1),
+                conn.cmd('lrange', 'key', 0, 2),
+                conn.cmd('lrange', 'key', 0, 1),
+                conn.cmd('lrange', 'key', 0, 0)
+            ]);
+        }).then(function(results) {
+            expect(results).toEqual([[1,2,3], [1,2,3], [1,2], [1]]);
             done();
         });
     });
 
-    it("timeouts should work.", function(done) {
-        var did_fire = null;
-        var did_timeout = null;
-
-        var do_fire = function(value) {
-            if (value == undefined) {
-                did_timeout = true;
-            } else {
-                did_fire = true;
-            }
-        }
-        
-        var one = new InterruptTimer(do_fire, 1);
-        one.start();
-        
-        setTimeout(function() {
-            expect(did_timeout).toEqual(true);
+    it("lset; set an item within a list.", function(done) {
+        conn.all([
+            conn.cmd('rpush', 'key', 1),
+            conn.cmd('rpush', 'key', 2),
+            conn.cmd('rpush', 'key', 3)
+        ]).then(function(results) {
+            return conn.all([
+                conn.cmd('lset','key', 0, 'testing'),
+                conn.cmd('lrange', 'key', 0, -1)
+            ]);
+        }).then(function(results) {
+            expect(results[1]).toEqual(['testing', 2, 3]);
             done();
-        }, 100);
+        });
     });
-
-    it("Make sure value calls correctly if the fire method is called.", function(done) {
-        var did_fire = null;
-        var did_timeout = null;
-        var do_fire = function(value) {
-            if (value == undefined) {
-                did_timeout = true;
-            } else {
-                did_fire = true;
-            }
-        }
-        
-        var one = new InterruptTimer(do_fire, 100);
-        one.start();
-
-        setTimeout(function() {
-            one.fire('boom');
-        }, 10);
-        
-        setTimeout(function() {
-            expect(did_fire).toEqual(true);
-            done();
-        }, 50);
-    });
-
-    it("ensure only one method gets called.", function(done) {
-        var did_fire = null;
-        var did_timeout = null;
-        var do_fire = function(value) {
-            if (value == undefined) {
-                did_timeout = true;
-            } else {
-                did_fire = true;
-            }
-        }
-        
-        var one = new InterruptTimer(do_fire, 10);
-        one.start();
-        one.fire('asdf');
-        one.cancel();
-
-        expect(did_fire).toEqual(true);
-        expect(did_timeout).toEqual(null);
-        done();
-    });
-
 });

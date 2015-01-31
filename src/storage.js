@@ -538,7 +538,58 @@ var SimpleRedis = (function() {
             });
             dbhandle.resolve();        
         };
+
+        this.COMMANDS['lset'] = function(si, args, result, dbhandle) {
+            si.prep('get', args[0]).then(function(r) {
+                if (r == undefined) {
+                    // key doesn't exist yet.
+                    result.resolve(undefined);
+                } else {
+                    var nargs = args.slice(1);
+                    var prev = JSON.parse(r);
+                    var index = args[1];
+                    var value = args[2];
+                    if (index < 0) {
+                        index = prev.length + index;
+                    }
+                    prev[index] = value;
+                    si.prep('set', args[0], JSON.stringify(prev)).then(function() {
+                        result.resolve(prev[index]);
+                    });
+                }
+            });
+            dbhandle.resolve();        
+        };
+
+        this.COMMANDS['lrange'] = function(si, args, result, dbhandle) {
+            si.prep('get', args[0]).then(function(r) {
+                if (r == undefined) {
+                    // key doesn't exist yet.
+                    result.resolve(undefined);
+                } else {
+                    var nargs = args.slice(1);
+                    var prev = JSON.parse(r);
+                    var start_index = args[1];
+                    var end_index = args[2];
+                    
+                    if (start_index < 0) {
+                        start_index = prev.length + start_index;
+                    }
+
+                    if (end_index < 0) {
+                        end_index = prev.length + end_index;
+                    }
+
+                    result.resolve(prev.slice(start_index, end_index+1));
+                }
+            });
+            dbhandle.resolve();        
+        };
+
+        
     };
+
+    
 
     SimpleRedisCore.prototype = new SimpleIndex(false);
 

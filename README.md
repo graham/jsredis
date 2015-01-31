@@ -46,9 +46,9 @@ Lists:
    - [ ] lpop
    - [x] lpush
    - [ ] lpushx
-   - [ ] lrange
+   - [x] lrange
    - [x] lrem
-   - [ ] lset
+   - [x] lset
    - [ ] ltrim
    - [ ] rpop
    - [ ] rpoplpush
