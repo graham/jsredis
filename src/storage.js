@@ -2,601 +2,280 @@ var l = function() {
     console.log( arguments );
 }
 
-var SimpleIndex = (function() {
-    var TIMEOUT_MS = 0;
-    var TIMEOUT_MS_BIG = 0;
+var Redis = (function() {
 
-    var CORE_COMMANDS = {};
-    CORE_COMMANDS['get'] = function(si, args, result, dbhandle) {
-        var tx = si.db.transaction('keys', 'readwrite');        
-        var key = args[0];
-        var store = tx.objectStore("keys");
-        var index = store.index("by_key");
-            
-        var request = index.get(key);
-        request.onsuccess = function() {
-            var matching = request.result;
-            if (!matching) {
-                result.resolve(undefined);
-            } else {
-                result.resolve(matching.value);
-            }
-            dbhandle.resolve();
-        }
-        request.onerror = function() {
-            result.reject(key);
-            dbhandle.resolve();
-        }
-    };
-
-    CORE_COMMANDS['exists'] = function(si, args, result, dbhandle) {
-        var tx = si.db.transaction('keys', 'readwrite');        
-        var key = args[0];
-        var store = tx.objectStore("keys");
-        var index = store.index("by_key");
-            
-        var request = index.get(key);
-        request.onsuccess = function() {
-            var matching = request.result;
-            if (!matching) {
-                result.resolve(false);
-            } else {
-                result.resolve(true);
-            }
-            dbhandle.resolve();
-        }
-        request.onerror = function() {
-            result.reject(key);
-            dbhandle.resolve();
-        }
-    };
-
-    CORE_COMMANDS['set'] = function(si, args, result, dbhandle) {
-        var tx = si.db.transaction('keys', 'readwrite');
-        var key = args[0];
-        var value = args[1];
-
-        var store = tx.objectStore("keys");
-        var index = store.index("by_key");
-        var request = index.openCursor(IDBKeyRange.only(key));
-        
-        request.onsuccess = function() {
-            var cursor = request.result;
-            var new_value = {'key':key, 'value':value, 'type':value.constructor.name};
-            
-            if (cursor) {
-                cursor.update(new_value);
-                result.resolve(value);
-                dbhandle.resolve();
-            } else {
-                store.put(new_value)
-                tx.oncomplete = function() {
-                    result.resolve(value);
-                    dbhandle.resolve();
-                };
-            }
-        };
-        
-        request.onerror = function() {
-            result.reject(key);
-            dbhandle.resolve();
-        };
-    };
-
-    CORE_COMMANDS['del'] = function(si, args, result, dbhandle) {
-        var tx = si.db.transaction('keys', 'readwrite');
-        var key = args[0];
-
-        var store = tx.objectStore("keys");
-        var index = store.index("by_key");
-        var request = index.openCursor(IDBKeyRange.only(key));
-        
-        request.onsuccess = function() {
-            var cursor = request.result;
-            
-            if (cursor) {
-                store.delete(key);
-                result.resolve(true);
-                dbhandle.resolve();
-            } else {
-                store.del(key);
-                tx.oncomplete = function() {
-                    result.resolve(false);
-                    dbhandle.resolve();
-                };
-            }
-        };
-        
-        request.onerror = function() {
-            result.reject(key);
-            dbhandle.resolve();
-        };
-    };
-
-    
-    CORE_COMMANDS['keys'] = function(si, args, result, dbhandle) {
-        var tx = si.db.transaction('keys', 'readwrite');
-
-        var store = tx.objectStore("keys");
-        var index = store.index("by_key");
-        var request = index.openCursor();
-
-        var collector = [];
-        
-        request.onsuccess = function() {
-            var cursor = request.result;
-            
-            if (cursor) {
-                collector.push(cursor.key);
-                cursor.continue();
-            } else {
-                result.resolve(collector);
-                dbhandle.resolve();
-            }
-        };
-        
-        request.onerror = function() {
-            result.reject(key);
-            dbhandle.resolve();
-        };
-    };
-
-    
-    var Simple = function(name) {
-        this.name = name;
-        this.db = null;
-
-        this.command_queue = [];
-        this.looper = null;
-        this.COMMANDS = CORE_COMMANDS;
-    };
-
-    Simple.prototype.init_db = function(name) {
-        if (name != undefined) {
-            this.name = name;
-        }
-        var _this = this;
-        
-        if (this.db) {
-            this.close();
-        }
-        
-        this.db = null;
-        this.command_queue = [];
-        
-        this.ready = new Promise(function(resolve, reject) {
-            var db_hook = indexedDB.open(_this.name);
-            
-            // This will only be called if the database didn't previously exist
-            // or if the version number has changed.
-            db_hook.onupgradeneeded = function() {
-                var db = db_hook.result;
-                
-                var store = db.createObjectStore("keys", {keyPath: "key"});
-                var keyIndex = store.createIndex("by_key", "key", {unique:true});
-
-                _this.db = db;
-                //console.log("Simple Database created.");
-                setTimeout(resolve, TIMEOUT_MS);
-            };
-            
-            // We've successfully connected to the database, because it already
-            // existed and we can just start working.
-            db_hook.onsuccess = function() {
-                //console.log('Connected to database.');
-                _this.db = db_hook.result;
-                setTimeout(resolve, TIMEOUT_MS);
-                //_this.process();
-            };
-            
-            db_hook.onerror = function() {
-                console.log(db_hook.error);
-                reject();
-            };
-        });
-        return this.ready;
-    };
-
-    Simple.prototype.cmd = function() {
-        var newargs = Array.prototype.slice.call(arguments);
-        var result = new PromiseValue();
-        this.command_queue.push([newargs[0], newargs.slice(1), result]);
-        this.process();
-        return result.internal_promise;
-    };
-
-    Simple.prototype.prep = function() {
-        var newargs = Array.prototype.slice.call(arguments);
-        var result = new PromiseValue();
-        this.command_queue = [[newargs[0], newargs.slice(1), result]].concat(this.command_queue);
-        this.process();
-        return result.internal_promise;
-    };
-    
-    Simple.prototype.get = function(key) {
-        return this.cmd('get', key);
-    };
-
-    Simple.prototype.set = function(key, value) {
-        return this.cmd('set', key, value);
-    };
-
-    Simple.prototype.exists = function(key) {
-        return this.cmd('exists', key);
-    };
-
-    Simple.prototype.del = function(key) {
-        return this.cmd('del', key);
-    };
-
-    Simple.prototype.keys = function(match) {
-        return this.cmd('keys', match);
-    };
-
-    Simple.prototype.reset_all_data = function(count) {
-        this.command_queue = [];
-        if (this.looper) {
-            clearTimeout(this.looper);
-        }
-        this.looper = null;
-        
-        if (count == undefined) { count = 1; }
-        var _this = this;
-        
-        if (this.db) { this.close(); }
-        
-        this.db = null;
-
-        return new Promise(function(resolve, reject) {
-            setTimeout(function() {
-                var req = indexedDB.deleteDatabase( _this.name );
-            
-                req.onsuccess = function () {
-                    //console.log('reset successful.');
-                    setTimeout(resolve, TIMEOUT_MS);
-                };
-                req.onerror = function () {
-                    console.log('reset error');                
-                    setTimeout(reject, TIMEOUT_MS);
-                };
-                req.onblocked = function () {
-                    console.log(this);
-                    console.log('reset blocked');
-                    if (count > 10) {
-                        setTimeout(reject, TIMEOUT_MS);
-                    } else {
-                        setTimeout(function() { _this.reset_all_data(count+1); }, TIMEOUT_MS_BIG);
-                    }
-                };
-            }, TIMEOUT_MS+1);
+    Promise.prototype.log = function() {
+        this.then(function(args) {
+            console.log("Resolve: " + args);
+        }, function(args) {
+            console.log("Reject: " + args);
         });
     };
 
-    Simple.prototype.consume_queue = function() {
-        var _this = this;
+    var StoragePlugin = function() {};
+    StoragePlugin.prototype.init = function() {};
+    StoragePlugin.prototype.get = function() {};
+    StoragePlugin.prototype.set = function() {};
+    StoragePlugin.prototype.update = function() {};
+    StoragePlugin.prototype.remove = function() {};
+    StoragePlugin.prototype.keys = function() {};
 
-        if (this.db == null) {
-            // happens if there is an error or if the db is reset.
-            return;
-        }
-        
-        if (this.command_queue.length > 0) {
-            var command = this.command_queue[0];
-            this.command_queue = this.command_queue.slice(1);
-
-            var callback = _this.COMMANDS[command[0]];
-            if (callback == undefined) {
-                throw "Undefined command: " + command[0];
-            }
-
-            var args = command[1];
-            var dbhandle = new PromiseValue();
-            
-            var result_promise = command[2];
-            var p = callback(_this, args, result_promise, dbhandle);
-            
-            dbhandle.then(function() {
-                _this.looper = setTimeout(function() { _this.consume_queue(); }, TIMEOUT_MS);
-            });
+    var LocalStoragePlugin = function(is_session) {
+        if (is_session == true) {
+            this.conn = sessionStorage;
         } else {
-            clearTimeout(_this.looper);
-            _this.looper = null;
+            this.conn = localStorage;
         }
     };
 
-    Simple.prototype.process = function() {
-        if (this.db == null) {
-            return;
-        }
-        var _this = this;
-        if (this.looper == null) {
-            this.looper = setTimeout(function() { _this.consume_queue(); }, TIMEOUT_MS);
-        }
+    LocalStoragePlugin.prototype.init = function() {};
+    
+    LocalStoragePlugin.prototype.get = function(key) {
+        var plugin = this;
+        return new Promise(function(resolve, reject) {
+            var value = plugin.conn.getItem(key);
+            resolve(value);
+        });
     };
 
-    Simple.prototype.close = function() {
+    LocalStoragePlugin.prototype.set = function(key, value) {
+        var plugin = this;        
+        return new Promise(function(resolve, reject) {
+            plugin.conn.setItem(key, value);
+            resolve(value);
+        });
+    };
+
+    LocalStoragePlugin.prototype.update = function(key, cb) {
+        var plugin = this;        
+        return new Promise(function(resolve, reject) {
+            var value = plugin.conn.getItem(key);
+            var result = null;
+
+            try {
+                result = cb(value);
+            } catch (e) {
+                reject(e);
+            }
+
+            var new_value = result[0];
+            var return_value = result[1];
+
+            if (new_value != undefined) {
+                plugin.conn.setItem(key, new_value);
+            }
+            resolve(return_value);
+        });
+    };
+
+    LocalStoragePlugin.prototype.remove = function(key) {
+        var plugin = this;        
+        return new Promise(function(resolve, reject) {
+            plugin.conn.removeItem(key);
+            resolve();
+        });
+    };
+
+    LocalStoragePlugin.prototype.keys = function() {
+        var plugin = this;
+        return new Promise(function(resolve, reject) {
+            var keys = [];
+            for (var key in plugin.conn){
+                keys.push(key);
+            }
+            resolve(keys);
+        });
+    }
+
+    var Cursor = function(plugin) {
+        this.plugin = plugin;
         this.command_queue = [];
-        clearTimeout(this.looper);
-        if (this.db) {
-            this.db.close();
-            this.db = null;
-        }
+        this.looper = null;
+        this.ready = null;
+        this.init();
     };
-
-    Simple.prototype.all = function(good, bad) {
+    
+    Cursor.prototype.all = function(good, bad) {
         return Promise.all(good, bad);
     };
-    
-    return Simple;
-})();
 
-var SimpleRedis = (function() {
-    var SimpleRedisCore = function(name) {
-        this.name = name;
-
-        this.COMMANDS['setnx'] = function(si, args, result, dbhandle) {
-            var tx = si.db.transaction('keys', 'readwrite');
-            var key = args[0];
-            var value = args[1];
-            
-            var store = tx.objectStore("keys");
-            var index = store.index("by_key");
-            var request = index.openCursor(IDBKeyRange.only(key));
-            
-            request.onsuccess = function() {
-                var cursor = request.result;
-                var new_value = {'key':key, 'value':value, 'type':value.constructor.name};
-                
-                if (cursor) {
-                    result.resolve(0);
-                    dbhandle.resolve();
-                } else {
-                    store.put(new_value)
-                    tx.oncomplete = function() {
-                        result.resolve(1);
-                        dbhandle.resolve();
-                    };
-                }
-            };
-            
-            request.onerror = function() {
-                result.reject(key);
-                dbhandle.resolve();
-            };
-        };
-
-        this.COMMANDS['rpush'] = function(si, args, result, dbhandle) {
-            si.prep('get', args[0]).then(function(r) {
-                if (r == undefined) {
-                    // key doesn't exist yet.
-                    var nargs = args.slice(1);
-                    si.prep('set', args[0], JSON.stringify(nargs));
-                    result.resolve(nargs.length);
-                } else {
-                    var nargs = args.slice(1);
-                    var prev = JSON.parse(r);
-                    var newval = prev.concat(nargs);
-                    si.prep('set', args[0], JSON.stringify(newval));
-                    result.resolve(newval.length);
-                }
-            });
-            dbhandle.resolve();
-        };
-        
-        this.COMMANDS['lpush'] = function(si, args, result, dbhandle) {
-            si.prep('get', args[0]).then(function(r) {
-                if (r == undefined) {
-                    // key doesn't exist yet.
-                    var nargs = args.slice(1);
-                    si.prep('set', args[0], JSON.stringify(nargs));
-                    result.resolve(nargs.length);
-                } else {
-                    var nargs = args.slice(1);
-                    var prev = JSON.parse(r);
-                    var newval = nargs.concat(prev);
-                    si.prep('set', args[0], JSON.stringify(newval));
-                    result.resolve(newval.length);
-                }
-            });
-            dbhandle.resolve();
-        };
-        
-        this.COMMANDS['lpop'] = function(si, args, result, dbhandle) {
-            si.prep('get', args[0]).then(function(r) {
-                if (r == undefined) {
-                    // key doesn't exist yet.
-                    var nargs = args.slice(1);
-                    si.prep('set', args[0], JSON.stringify(nargs));
-                    result.resolve(undefined);
-                } else {
-                    var nargs = args.slice(1);
-                    var prev = JSON.parse(r);
-                    var ret = prev[0];
-                    var newval = prev.slice(1);
-                    si.prep('set', args[0], JSON.stringify(newval));
-                    result.resolve(ret);
-                }
-            });
-            dbhandle.resolve();        
-        };
-        
-        this.COMMANDS['rpop'] = function(si, args, result, dbhandle) {
-            si.prep('get', args[0]).then(function(r) {
-                if (r == undefined) {
-                    // key doesn't exist yet.
-                    var nargs = args.slice(1);
-                    si.prep('set', args[0], JSON.stringify(nargs));
-                    result.resolve(undefined);
-                } else {
-                    var nargs = args.slice(1);
-                    var prev = JSON.parse(r);
-                    var ret = prev[prev.length-1];
-                    var newval = prev.slice(0,prev.length-1);
-                    si.prep('set', args[0], JSON.stringify(newval));
-                    result.resolve(ret);
-                }
-            });
-            dbhandle.resolve();        
-        };
-
-        this.COMMANDS['lindex'] = function(si, args, result, dbhandle) {
-            si.prep('get', args[0]).then(function(r) {
-                if (r == undefined) {
-                    // key doesn't exist yet.
-                    result.resolve(undefined);
-                } else {
-                    var nargs = args.slice(1);
-                    var prev = JSON.parse(r);
-                    var index = args[1];
-                    if (index < 0) {
-                        index = prev.length + index;
-                    }
-                    result.resolve(prev[index]);
-                }
-            });
-            dbhandle.resolve();        
-        };
-
-        this.COMMANDS['lrem'] = function(si, args, result, dbhandle) {
-            si.prep('get', args[0]).then(function(r) {
-                if (r == undefined) {
-                    // key doesn't exist yet.
-                    result.resolve(undefined);
-                } else {
-                    var nargs = args.slice(1);
-                    var prev = JSON.parse(r);
-                    var newval = [];
-                    var count = nargs[0];
-                    var check = nargs[1];
-
-                    if (count > 0) {
-                        for(var i=0; i < prev.length; i++) {
-                            var match = false;
-                            if (check == prev[i]) {
-                                match = true;
-                            }
-
-                            if (match) {
-                                if (count == 0) {
-                                    newval.push(prev[i]);
-                                } else {
-                                    count -= 1;
-                                }                                    
-                            } else {
-                                newval.push(prev[i]);
-                            }
-                        }
-                    } else if (count < 0) {
-                        for(var i=prev.length-1; i >= 0; i--) {
-                            var match = false;
-                            if (check == prev[i]) {
-                                match = true;
-                            }
-
-                            if (match) {
-                                if (count == 0) {
-                                    newval.push(prev[i]);
-                                } else {
-                                    count += 1;
-                                }                                    
-                            } else {
-                                newval.push(prev[i]);
-                            }
-                        }
-
-                        newval.reverse();
-                    } else if (count == 0) {
-                        for(var i=0; i < prev.length; i++) {
-                            var match = false;
-                            if (check == prev[i]) {
-                                match = true;
-                            }
-                            
-                            if (!match) {
-                                newval.push(prev[i]);
-                            }
-                        }
-                    }
-
-                    si.prep('set', args[0], JSON.stringify(newval));
-                    result.resolve(count);
-                }
-            });
-            dbhandle.resolve();        
-        };
-        
-        this.COMMANDS['llen'] = function(si, args, result, dbhandle) {
-            si.prep('get', args[0]).then(function(r) {
-                if (r == undefined) {
-                    // key doesn't exist yet.
-                    result.resolve(undefined);
-                } else {
-                    var nargs = args.slice(1);
-                    var prev = JSON.parse(r);
-                    result.resolve(prev.length);
-                }
-            });
-            dbhandle.resolve();        
-        };
-
-        this.COMMANDS['lset'] = function(si, args, result, dbhandle) {
-            si.prep('get', args[0]).then(function(r) {
-                if (r == undefined) {
-                    // key doesn't exist yet.
-                    result.resolve(undefined);
-                } else {
-                    var nargs = args.slice(1);
-                    var prev = JSON.parse(r);
-                    var index = args[1];
-                    var value = args[2];
-                    if (index < 0) {
-                        index = prev.length + index;
-                    }
-                    prev[index] = value;
-                    si.prep('set', args[0], JSON.stringify(prev)).then(function() {
-                        result.resolve(prev[index]);
-                    });
-                }
-            });
-            dbhandle.resolve();        
-        };
-
-        this.COMMANDS['lrange'] = function(si, args, result, dbhandle) {
-            si.prep('get', args[0]).then(function(r) {
-                if (r == undefined) {
-                    // key doesn't exist yet.
-                    result.resolve(undefined);
-                } else {
-                    var nargs = args.slice(1);
-                    var prev = JSON.parse(r);
-                    var start_index = args[1];
-                    var end_index = args[2];
-                    
-                    if (start_index < 0) {
-                        start_index = prev.length + start_index;
-                    }
-
-                    if (end_index < 0) {
-                        end_index = prev.length + end_index;
-                    }
-
-                    result.resolve(prev.slice(start_index, end_index+1));
-                }
-            });
-            dbhandle.resolve();        
-        };
-
-        
+    Cursor.prototype.init = function() {
+        this.plugin.init();
+        this.ready = new Promise(function(resolve, reject) {
+            resolve();
+        });
     };
 
-    
+    Cursor.prototype.get = function(key) {
+        return this.plugin.get(key);
+    };
 
-    SimpleRedisCore.prototype = new SimpleIndex(false);
+    Cursor.prototype.set = function(key, value) {
+        return this.plugin.set(key, value);
+    };
 
-    return SimpleRedisCore;
+    Cursor.prototype.incr = function(key) {
+        return this.plugin.update(key, function(prev_value) {
+            var int_value = parseInt(prev_value);
+            if (isNaN(int_value)) {
+                throw "Calling incr on '" + key + "': " + prev_value + " is NaN.";
+            } else {
+                return [int_value + 1, prev_value];
+            }
+        });
+    };
+
+    Cursor.prototype.incrby = function(key, increment) {
+        return this.plugin.update(key, function(prev_value) {
+            var int_value = parseInt(prev_value);
+            if (isNaN(int_value)) {
+                throw "Calling incrby on '" + key + "': " + prev_value + " is NaN.";
+            } else {
+                return [int_value + increment, prev_value];
+            }
+        });
+    };
+
+    Cursor.prototype.decr = function(key) {
+        return this.plugin.update(key, function(prev_value) {
+            var int_value = parseInt(prev_value);
+            if (isNaN(int_value)) {
+                throw "Calling decr on '" + key + "': " + prev_value + " is NaN.";
+            } else {
+                return [int_value - 1, prev_value];
+            }
+        });
+    };
+
+    Cursor.prototype.decrby = function(key, increment) {
+        return this.plugin.update(key, function(prev_value) {
+            var int_value = parseInt(prev_value);
+            if (isNaN(int_value)) {
+                throw "Calling decrby on '" + key + "': " + prev_value + " is NaN.";
+            } else {
+                return [int_value - increment, prev_value];
+            }
+        });
+    };
+
+    Cursor.prototype.flushdb = function() {
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.conn.clear();
+            resolve();
+        });
+    }
+
+    Cursor.prototype.exists = function(key) {
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.get(key).then(function(result) {
+                if (result == null) {
+                    resolve(false);
+                } else {
+                    resolve(true);
+                }
+            });
+        });
+    }
+
+    Cursor.prototype.keys = function() {
+        return this.plugin.keys();
+    };
+
+    Cursor.prototype.del = function(key) {
+        return this.plugin.remove(key);
+    };
+
+    Cursor.prototype.append = function(key, value) {
+        return this.plugin.update(key, function(prev_value) {
+            if (!prev_value) {
+                prev_value = '';
+            }
+            var new_value = prev_value + value;
+            return [new_value, new_value.length];
+        });
+    };
+
+    Cursor.prototype.mset = function() {
+        var all = [];
+
+        for(var i=0; i < arguments.length; i += 2) {
+            var key = arguments[i];
+            var value = arguments[i+1];
+            all.push(this.plugin.set(key, value));
+        }
+        return Promise.all(all);
+    };
+
+    Cursor.prototype.mget = function() {
+        var all = [];
+
+        for(var i=0; i < arguments.length; i++) {
+            var key = arguments[i];
+            all.push(this.plugin.get(key));
+        }
+        return Promise.all(all);
+    };
+
+    Cursor.prototype.setnx = function(key, value) {
+        return this.plugin.update(key, function(prev_value) {
+            if (!prev_value) {
+                return [value, 1];
+            } else {
+                return [undefined, 0];
+            }
+        });
+    };
+
+    Cursor.prototype.strlen = function(key) {
+        return new Promise(function(resolve, reject) {
+            plugin.get(key).then(function(result) {
+                if (result == null) {
+                    resolve(0);
+                } else {
+                    resolve(result.length);
+                }
+            });
+        });
+    };
+
+    Cursor.prototype.rename = function(key, newkey) {
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.get(key).then(function(value) {
+                plugin.set(newkey, value).then(function() {
+                    resolve();
+                });
+            });
+        });
+    };
+
+    Cursor.prototype.renamenx = function(key, newkey) {
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.get(key).then(function(value) {
+                if (!value) {
+                    plugin.set(newkey, value).then(function() {
+                        resolve(1);
+                    });
+                } else {
+                    resolve(0);
+                };
+            });
+        });
+    };
+
+    Cursor.prototype.getrange = function(key, start, end) {};
+    Cursor.prototype.setrange = function(key, offset, value) {};
+
+    function easy_connect(options) {
+        return new Cursor(new LocalStoragePlugin());
+    }
+
+    return {
+        'Cursor'             : Cursor,
+        'LocalStoragePlugin' : LocalStoragePlugin,
+        'connect'            : easy_connect
+    };
 })();
-
-if (typeof jsredis_module !== 'undefined') {
-    jsredis_module.exports.storage = storage;
-}
-
