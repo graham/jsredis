@@ -3,12 +3,12 @@ var l = function() {
 }
 
 var Redis = (function() {
-
     Promise.prototype.log = function() {
         this.then(function(args) {
             console.log("Resolve: " + args);
         }, function(args) {
             console.log("Reject: " + args);
+            throw args;
         });
     };
 
@@ -26,15 +26,23 @@ var Redis = (function() {
         } else {
             this.conn = localStorage;
         }
+        this.init();
     };
 
-    LocalStoragePlugin.prototype.init = function() {};
+    LocalStoragePlugin.prototype.init = function() {
+        this.ready = new Promise(function(resolve, reject) {
+            resolve();
+        });
+    };
     
     LocalStoragePlugin.prototype.get = function(key) {
         var plugin = this;
         return new Promise(function(resolve, reject) {
             var value = plugin.conn.getItem(key);
-            resolve(value);
+            if (value == null) {
+                value = undefined;
+            }
+            resolve(value);            
         });
     };
 
@@ -65,6 +73,7 @@ var Redis = (function() {
                 plugin.conn.setItem(key, new_value);
             }
             resolve(return_value);
+            return return_value;
         });
     };
 
@@ -162,7 +171,9 @@ var Redis = (function() {
         var plugin = this.plugin;
         return new Promise(function(resolve, reject) {
             plugin.conn.clear();
-            resolve();
+            setTimeout(function() {
+                resolve();
+            }, 100);
         });
     }
 
@@ -170,7 +181,7 @@ var Redis = (function() {
         var plugin = this.plugin;
         return new Promise(function(resolve, reject) {
             plugin.get(key).then(function(result) {
-                if (result == null) {
+                if (result == null || result == undefined) {
                     resolve(false);
                 } else {
                     resolve(true);
@@ -206,6 +217,43 @@ var Redis = (function() {
             all.push(this.plugin.set(key, value));
         }
         return Promise.all(all);
+    };
+
+    Cursor.prototype.msetnx = function() {
+        var _this = this;
+        var plugin = this.plugin;
+        var args = arguments;
+        return new Promise(function(resolve, reject) {
+            var all = [];
+            
+            for(var i=0; i < args.length; i += 2) {
+                var key = args[i];
+                var value = args[i+1];
+                all.push(_this.exists(key));
+            }
+            
+            Promise.all(all).then(function(results) {
+                var hit = false;
+                for(var i = 0; i < results.length; i++) {
+                    if (results[i] == true) {
+                        hit = true;
+                    }
+                }
+                if (hit == false) {
+                    var set_all = [];
+                    for(var i=0; i < args.length; i += 2) {
+                        var key = args[i];
+                        var value = args[i+1];
+                        set_all.push(plugin.set(key));
+                    }
+                    Promise.all(set_all).then(function() {
+                        resolve(1);
+                    });
+                } else {
+                    resolve(0);
+                }
+            });
+        });
     };
 
     Cursor.prototype.mget = function() {
@@ -268,6 +316,223 @@ var Redis = (function() {
 
     Cursor.prototype.getrange = function(key, start, end) {};
     Cursor.prototype.setrange = function(key, offset, value) {};
+    Cursor.prototype.lrem = function() {};
+    
+    Cursor.prototype.lindex = function(key, index) {
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.get(key).then(function(value) {
+                value = JSON.parse(value);
+                if (index < 0) {
+                    index = value.length + index;
+                }
+                resolve(value[index]);
+            });
+        });
+    };
+
+    Cursor.prototype.lrange = function(key, start, stop) {
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.get(key).then(function(prev_value) {
+                if (!prev_value) {
+                    prev_value = [];
+                } else {
+                    prev_value = JSON.parse(prev_value);
+                }
+                if (stop < 0) {
+                    stop = prev_value.length + (stop+1);
+                } else {
+                    stop += 1;
+                }
+                resolve(prev_value.slice(start, stop));
+            });
+        });
+    };
+
+    Cursor.prototype.llen = function(key, index) {
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.get(key).then(function(value) {
+                value = JSON.parse(value);
+                resolve(value.length);
+            });
+        });
+    };
+
+    Cursor.prototype.lset = function(key, index, value) {
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.update(key, function(prev_value) {
+                if (!prev_value) {
+                    prev_value = [];
+                } else {
+                    prev_value = JSON.parse(prev_value);
+                }
+                if (index < 0) {
+                    index = prev_value.length + index;
+                }
+                
+                prev_value[index] = value
+                return [JSON.stringify(prev_value), prev_value.length];
+            }).then(function(value) {
+                resolve(value);
+            });
+        });
+    };
+
+    Cursor.prototype.ltrim = function(key, start, stop) {
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.update(key, function(prev_value) {
+                if (!prev_value) {
+                    prev_value = [];
+                } else {
+                    prev_value = JSON.parse(prev_value);
+                }
+                if (stop < 0) {
+                    stop = prev_value.length + (stop+1);
+                }
+                var new_value = prev_value.slice(start, stop);
+                return [JSON.stringify(new_value), new_value.length];
+            }).then(function(value) {
+                resolve(value);
+            });
+        });
+    };
+
+    Cursor.prototype.rpush = function(key) {
+        var plugin = this.plugin;
+        var outer_args = Array.prototype.slice.call(arguments, 1);
+        return new Promise(function(resolve, reject) {
+            plugin.update(key, function(prev_value) {
+                if (!prev_value) {
+                    prev_value = [];
+                } else {
+                    prev_value = JSON.parse(prev_value);
+                }
+                var new_value = prev_value.concat(outer_args);
+                return [JSON.stringify(new_value), new_value.length];
+            }).then(function(value) {
+                resolve(value);
+            });
+        });
+    };
+
+    Cursor.prototype.rpushx = function(key) {
+        var plugin = this.plugin;
+        var outer_args = Array.prototype.slice.call(arguments, 1);
+        return new Promise(function(resolve, reject) {
+            plugin.update(key, function(prev_value) {
+                if (!prev_value) {
+                    return [undefined, 0];
+                } else {
+                    prev_value = JSON.parse(prev_value);
+                }
+                var new_value = prev_value.concat(outer_args);
+                return [JSON.stringify(new_value), new_value.length];
+            }).then(function(value) {
+                resolve(value);
+            });
+        });
+    };
+
+    Cursor.prototype.lpush = function(key) {
+        var plugin = this.plugin;
+        var outer_args = Array.prototype.slice.call(arguments, 1);
+        return new Promise(function(resolve, reject) {
+            plugin.update(key, function(prev_value) {
+                if (!prev_value) {
+                    prev_value = [];
+                } else {
+                    prev_value = JSON.parse(prev_value);
+                }
+                var new_value = outer_args.concat(prev_value);
+                return [JSON.stringify(new_value), new_value.length];
+            }).then(function(value) {
+                resolve(value);
+            });
+        });
+    };
+
+    Cursor.prototype.lpushx = function(key) {
+        var plugin = this.plugin;
+        var outer_args = Array.prototype.slice.call(arguments, 1);
+        return new Promise(function(resolve, reject) {
+            plugin.update(key, function(prev_value) {
+                if (!prev_value) {
+                    return [undefined, 0];
+                } else {
+                    prev_value = JSON.parse(prev_value);
+                }
+                var new_value = outer_args.concat(prev_value);
+                return [JSON.stringify(new_value), new_value.length];
+            }).then(function(value) {
+                resolve(value);
+            });
+        });
+    };
+
+    Cursor.prototype.rpop = function(key) {
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.update(key, function(prev_value) {
+                if (!prev_value) {
+                    prev_value = [];
+                } else {
+                    prev_value = JSON.parse(prev_value);
+                }
+                var value = prev_value[prev_value.length-1];
+                var new_value = prev_value.slice(0, prev_value.length-1);
+                return [JSON.stringify(new_value), value];
+            }).then(function(value) {
+                resolve(value);
+            });
+        });
+    };
+    
+    Cursor.prototype.lpop = function(key) {
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.update(key, function(prev_value) {
+                if (!prev_value) {
+                    prev_value = [];
+                } else {
+                    prev_value = JSON.parse(prev_value);
+                }
+                var value = prev_value[0];
+                var new_value = prev_value.slice(1);
+                return [JSON.stringify(new_value), value];
+            }).then(function(value) {
+                resolve(value);
+            });
+        });
+    };
+
+    Cursor.prototype.rpoplpush = function(source, destination) {
+        var _this = this;
+        var plugin = this.plugin;
+        return new Promise(function(resolve, reject) {
+            plugin.update(source, function(prev_value) {
+                if (!prev_value) {
+                    return [undefined, undefined];
+                } else {
+                    prev_value = JSON.parse(prev_value);
+                }
+                var value = prev_value[prev_value.length-1];
+                var new_value = prev_value.slice(0, prev_value.length-1);
+                return [JSON.stringify(new_value), value];
+            }).then(function(value) {
+                if (value == undefined) {
+                    resolve(undefined);
+                } else {
+                    _this.lpush(destination, value).then(function() {
+                        resolve(value);
+                    });
+                }
+            });
+        });
+    };
 
     function easy_connect(options) {
         return new Cursor(new LocalStoragePlugin());

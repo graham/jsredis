@@ -1,5 +1,4 @@
 var conn = null;
-
 // from: http://stackoverflow.com/questions/105034/create-guid-uuid-in-javascript
 function generateUUID(){
     var d = new Date().getTime();
@@ -13,15 +12,14 @@ function generateUUID(){
 
 describe("InterruptTimer tests", function() {
     beforeEach(function(done) {
-        conn = new SimpleRedis(generateUUID());
-        conn.init_db();        
+        conn = Redis.connect();
         conn.ready.then(function() {
             done();
         });            
     });
 
     afterEach(function(done) {
-        conn.reset_all_data().then(function() {
+        conn.flushdb().then(function() {
             done();
         });
     });
@@ -96,16 +94,14 @@ describe("InterruptTimer tests", function() {
 
 describe("Simple Index Functions", function() {
     beforeEach(function(done) {
-        conn = new SimpleIndex(generateUUID());
-        conn.init_db();
+        conn = Redis.connect();
         conn.ready.then(function() {
             done();
         });            
     });
 
     afterEach(function(done) {
-        conn.close();
-        conn.reset_all_data().then(function() {
+        conn.flushdb().then(function() {
             setTimeout(done, 100);
         });
     });
@@ -181,15 +177,14 @@ describe("Simple Index Functions", function() {
 
 describe("JSRedis String Functions", function() {
     beforeEach(function(done) {
-        conn = new SimpleRedis(generateUUID());
-        conn.init_db();        
+        conn = Redis.connect();
         conn.ready.then(function() {
             done();
         });            
     });
 
     afterEach(function(done) {
-        conn.reset_all_data().then(function() {
+        conn.flushdb().then(function() {
             done();
         });
     });
@@ -206,11 +201,11 @@ describe("JSRedis String Functions", function() {
             expect(result).toEqual(false);
 
             Promise.all([
-                conn.cmd('rpush', 'mylist', 0),
-                conn.cmd('rpush', 'mylist', 5),
-                conn.cmd('lpush', 'mylist', 8)
+                conn.rpush('mylist', 0),
+                conn.rpush('mylist', 5),
+                conn.lpush('mylist', 8)
             ]).then(function(values) {
-                conn.cmd('get', 'mylist').then(function(value) {
+                conn.get('mylist').then(function(value) {
                     expect(JSON.parse(value)).toEqual([8,0,5]);
                     done();
                 });
@@ -220,20 +215,20 @@ describe("JSRedis String Functions", function() {
 
     it("lpop and rpop; pop off both sides of a list.", function(done) {
         Promise.all([
-            conn.cmd('rpush', 'mylist', 1),
-            conn.cmd('rpush', 'mylist', 2),
-            conn.cmd('rpush', 'mylist', 3),
-            conn.cmd('lpush', 'mylist', 0)
+            conn.rpush('mylist', 1),
+            conn.rpush('mylist', 2),
+            conn.rpush('mylist', 3),
+            conn.lpush('mylist', 0)
         ]).then(function() {
-            conn.cmd('lpop', 'mylist').then(function(value) {
+            conn.lpop('mylist').then(function(value) {
                 expect(value).toEqual(0);
 
                 Promise.all([
-                    conn.cmd('lpop', 'mylist'),
-                    conn.cmd('lpop', 'mylist'),
-                    conn.cmd('rpush', 'mylist', 4),
-                    conn.cmd('lpop', 'mylist'),
-                    conn.cmd('lpop', 'mylist')               
+                    conn.lpop('mylist'),
+                    conn.lpop('mylist'),
+                    conn.rpush('mylist', 4),
+                    conn.lpop('mylist'),
+                    conn.lpop('mylist')               
                 ]).then(function(values) {
                     // this is a little hard to read,
                     // the first two are the values,
@@ -244,12 +239,12 @@ describe("JSRedis String Functions", function() {
                     return Next().resolve();
                 }).then(function() {
                     return conn.all([
-                        conn.cmd('rpush', 'mylist', 'a'),
-                        conn.cmd('rpush', 'mylist', 'b'),
-                        conn.cmd('lpush', 'mylist', 'A')
+                        conn.rpush('mylist', 'a'),
+                        conn.rpush('mylist', 'b'),
+                        conn.lpush('mylist', 'A')
                     ]);
                 }).then(function() {
-                    conn.cmd('rpop', 'mylist').then(function(value) {
+                    conn.rpop('mylist').then(function(value) {
                         expect(value).toEqual('b');
                         done();
                     });
@@ -260,14 +255,14 @@ describe("JSRedis String Functions", function() {
 
     it("should support lindex correctly (including negative)", function(done) {
         conn.all([
-            conn.cmd('rpush', 'mylist', 1),
-            conn.cmd('rpush', 'mylist', 2),
-            conn.cmd('rpush', 'mylist', 3)
+            conn.rpush('mylist', 1),
+            conn.rpush('mylist', 2),
+            conn.rpush('mylist', 3)
         ]).then(function() {
             conn.all([
-                conn.cmd('lindex', 'mylist', 2),
-                conn.cmd('lindex', 'mylist', 0),
-                conn.cmd('lindex', 'mylist', -1)
+                conn.lindex('mylist', 2),
+                conn.lindex('mylist', 0),
+                conn.lindex('mylist', -1)
             ]).then(function(values) {
                 expect(values).toEqual([3,1,3]);
                 done();
@@ -277,21 +272,21 @@ describe("JSRedis String Functions", function() {
 
     it("lrem all.", function(done) {
         conn.all([
-            conn.cmd('rpush', 'mylist', 1),
-            conn.cmd('rpush', 'mylist', 2),
-            conn.cmd('rpush', 'mylist', 3),
-            conn.cmd('rpush', 'mylist', 1),
-            conn.cmd('rpush', 'mylist', 1)
+            conn.rpush('mylist', 1),
+            conn.rpush('mylist', 2),
+            conn.rpush('mylist', 3),
+            conn.rpush('mylist', 1),
+            conn.rpush('mylist', 1)
         ]).then(function() {
             var n = Next();
 
-            conn.cmd('lrem', 'mylist', 0, 1).then(function() {
+            conn.lrem('mylist', 0, 1).then(function() {
                 n.resolve();
             });
 
             return n;
         }).then(function() {
-            conn.cmd('get', 'mylist').then(function(value) {
+            conn.get('mylist').then(function(value) {
                 expect(value).toEqual('[2,3]');
                 done();
             });
@@ -300,16 +295,16 @@ describe("JSRedis String Functions", function() {
 
     it("lrem some.", function(done) {
         conn.all([
-            conn.cmd('rpush', 'mylist', 'hello'),
-            conn.cmd('rpush', 'mylist', 'world'),
-            conn.cmd('rpush', 'mylist', 'hello'),            
-            conn.cmd('rpush', 'mylist', 'good'),
-            conn.cmd('rpush', 'mylist', 'hello'),
-            conn.cmd('rpush', 'mylist', 'hello')
+            conn.rpush('mylist', 'hello'),
+            conn.rpush('mylist', 'world'),
+            conn.rpush('mylist', 'hello'),            
+            conn.rpush('mylist', 'good'),
+            conn.rpush('mylist', 'hello'),
+            conn.rpush('mylist', 'hello')
         ]).then(function() {
             var n = Next();
 
-            conn.cmd('lrem', 'mylist', 1, 'hello').then(function() {
+            conn.lrem('mylist', 1, 'hello').then(function() {
                 n.resolve();
             });
 
@@ -317,7 +312,7 @@ describe("JSRedis String Functions", function() {
         }).then(function() {
             var n = Next();
             
-            conn.cmd('get', 'mylist').then(function(value) {
+            conn.get('mylist').then(function(value) {
                 expect(value).toEqual('["world","hello","good","hello","hello"]');
                 n.resolve();
             });
@@ -326,8 +321,8 @@ describe("JSRedis String Functions", function() {
         }).then(function() {
             var n = Next();
 
-            conn.cmd('lrem', 'mylist', -1, 'hello').then(function() {
-                conn.cmd('get', 'mylist').then(function(value) {
+            conn.lrem('mylist', -1, 'hello').then(function() {
+                conn.get('mylist').then(function(value) {
                     expect(value).toEqual('["world","hello","good","hello"]');
                     n.resolve();
                 });
@@ -340,14 +335,14 @@ describe("JSRedis String Functions", function() {
     });
 
     it("setnx; like set, but fails if key already exists.", function(done) {
-        conn.cmd('setnx', 'key', 'value').then(function(value) {
+        conn.setnx('key', 'value').then(function(value) {
             expect(value).toEqual(1);
-            return conn.cmd('get', 'key');
+            return conn.get('key');
         }).then(function(value) {
             expect(value).toEqual('value');
             return conn.all([
-                conn.cmd('setnx', 'key', 'newvalue'),
-                conn.cmd('get', 'key')
+                conn.setnx('key', 'newvalue'),
+                conn.get('key')
             ]);
         }).then(function(values) {
             expect(values[0]).toEqual(0);
@@ -358,11 +353,11 @@ describe("JSRedis String Functions", function() {
 
     it("llen; returns the length of a list.", function(done) {
         conn.all([
-            conn.cmd('rpush', 'key', 1),
-            conn.cmd('rpush', 'key', 2),
-            conn.cmd('rpush', 'key', 3)
+            conn.rpush('key', 1),
+            conn.rpush('key', 2),
+            conn.rpush('key', 3)
         ]).then(function(results) {
-            return conn.cmd('llen', 'key');
+            return conn.llen('key');
         }).then(function(length) {
             expect(length).toEqual(3);
             done();
@@ -371,15 +366,15 @@ describe("JSRedis String Functions", function() {
 
     it("lrange; gets a slice of a list.", function(done) {
         conn.all([
-            conn.cmd('rpush', 'key', 1),
-            conn.cmd('rpush', 'key', 2),
-            conn.cmd('rpush', 'key', 3)
+            conn.rpush('key', 1),
+            conn.rpush('key', 2),
+            conn.rpush('key', 3)
         ]).then(function(results) {
             return conn.all([
-                conn.cmd('lrange', 'key', 0, -1),
-                conn.cmd('lrange', 'key', 0, 2),
-                conn.cmd('lrange', 'key', 0, 1),
-                conn.cmd('lrange', 'key', 0, 0)
+                conn.lrange('key', 0, -1),
+                conn.lrange('key', 0, 2),
+                conn.lrange('key', 0, 1),
+                conn.lrange('key', 0, 0)
             ]);
         }).then(function(results) {
             expect(results).toEqual([[1,2,3], [1,2,3], [1,2], [1]]);
@@ -389,13 +384,13 @@ describe("JSRedis String Functions", function() {
 
     it("lset; set an item within a list.", function(done) {
         conn.all([
-            conn.cmd('rpush', 'key', 1),
-            conn.cmd('rpush', 'key', 2),
-            conn.cmd('rpush', 'key', 3)
+            conn.rpush('key', 1),
+            conn.rpush('key', 2),
+            conn.rpush('key', 3)
         ]).then(function(results) {
             return conn.all([
-                conn.cmd('lset','key', 0, 'testing'),
-                conn.cmd('lrange', 'key', 0, -1)
+                conn.lset('key', 0, 'testing'),
+                conn.lrange('key', 0, -1)
             ]);
         }).then(function(results) {
             expect(results[1]).toEqual(['testing', 2, 3]);
