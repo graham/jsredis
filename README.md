@@ -5,15 +5,13 @@ Redis is great, I've been a huge fan of it for years, it provides a ton of reall
 
 So why clone it in Javascript? Well, I often find that as an application grows, keeping track of the data you have gets more difficult, wouldn't it be nice if we could use the primitives provided to us by Redis in the browser?
 
-WebSQL would have been great, but unfortunately that's been killed ( http://stackoverflow.com/questions/4720592/what-is-the-status-of-html5-database ), and for now it appears IndexDB is gaining traction.
-
 I like Redis, I like the commands, I thinks it's pretty easy to map large amounts of data and more complex data flow onto the features it provides, and that's exactly what JSRedis is built to do.
 
 Internally it will likely change over time, and won't be nearly as optimized ( http://redis.io/topics/memory-optimization ) but it should provide you with the functionality.
 
 Task list, only completed if there is a test that passes :)
 
-Simple KV Interface for IndexedDB:
+Simple stuff for any KVS:
 
    - [x] get
    - [x] set
@@ -31,9 +29,9 @@ All Keys:
 
    - [ ] expire
    - [ ] presist
-   - [ ] rename
+   - [x] rename
+   - [x] renamenx
    - [ ] type
-   - [ ] renamenx
 
 Lists:
 
@@ -41,19 +39,19 @@ Lists:
    - [ ] brpop
    - [ ] brpoplpush
    - [x] lindex
-   - [ ] linsert
+   - [x] linsert
    - [x] llen
-   - [ ] lpop
+   - [x] lpop
    - [x] lpush
-   - [ ] lpushx
+   - [x] lpushx
    - [x] lrange
-   - [x] lrem
+   - [ ] lrem
    - [x] lset
-   - [ ] ltrim
-   - [ ] rpop
-   - [ ] rpoplpush
+   - [x] ltrim
+   - [x] rpop
+   - [x] rpoplpush
    - [x] rpush
-   - [ ] rpushx
+   - [x] rpushx
 
 Sets:
 
@@ -75,29 +73,29 @@ Sets:
 
 Strings:
 
-   - [ ] append
+   - [x] append
    - [ ] bitcount
    - [ ] bitop
    - [ ] bitpos
-   - [ ] decr
-   - [ ] decrby
+   - [x] decr
+   - [x] decrby
    - [x] get
    - [ ] getbit
-   - [ ] getrange
+   - [x] getrange
    - [ ] getset
-   - [ ] incr
-   - [ ] incrby
+   - [x] incr
+   - [x] incrby
    - [ ] incrbyfloat
-   - [ ] mget
-   - [ ] mset
-   - [ ] msetnx
+   - [x] mget
+   - [x] mset
+   - [x] msetnx
    - [ ] psetex
    - [x] set
    - [ ] setbit
    - [ ] setex
    - [x] setnx
    - [ ] setrange
-   - [ ] strlen
+   - [x] strlen
 
 Hashes:
 
