@@ -534,6 +534,14 @@ var Redis = (function() {
         });
     };
 
+    
+
+
+
+
+
+    
+
     Cursor.prototype.blpop = function() {
         var args = Array.prototype.slice.call(arguments);
         var keys = args.slice(0, args.length-1);

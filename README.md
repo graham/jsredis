@@ -23,7 +23,12 @@ Simple stuff for any KVS:
    - [ ] transactions
    - [ ] db lock (for multiple tabs).
 
-Redis Commands:
+Plugins:
+
+   - [x] localStorge / sessionStorage
+   - [ ] IndexedDB
+
+## Redis Commands:
 
 All Keys:
 
@@ -53,24 +58,6 @@ Lists:
    - [x] rpush
    - [x] rpushx
 
-Sets:
-
-   - [ ] sadd
-   - [ ] scard
-   - [ ] sdiff
-   - [ ] sdiffstore
-   - [ ] sinter
-   - [ ] sinterstore
-   - [ ] sismember
-   - [ ] smembers
-   - [ ] smove
-   - [ ] spop
-   - [ ] srandmember
-   - [ ] srem
-   - [ ] sunion
-   - [ ] sunionstore
-   - [ ] sscan
-
 Strings:
 
    - [x] append
@@ -91,14 +78,32 @@ Strings:
    - [x] setnx
    - [ ] setrange
    - [x] strlen
-   - [ ] getbit
 
 Bit Ops (harder to do in js):
 
    - [ ] bitcount
    - [ ] bitop
    - [ ] bitpos
+   - [ ] getbit
    - [ ] setbit
+
+Sets:
+
+   - [ ] sadd
+   - [ ] scard
+   - [ ] sdiff
+   - [ ] sdiffstore
+   - [ ] sinter
+   - [ ] sinterstore
+   - [ ] sismember
+   - [ ] smembers
+   - [ ] smove
+   - [ ] spop
+   - [ ] srandmember
+   - [ ] srem
+   - [ ] sunion
+   - [ ] sunionstore
+   - [ ] sscan
 
 Hashes:
 
@@ -117,4 +122,28 @@ Hashes:
    - [ ] hvals
    - [ ] hscan
 
-SortedSets, HyperLogLog, Pub/Sub, Transactions, Scripting, Server: Soon. :)
+Sorted Sets:
+
+   - [ ] zadd
+   - [ ] zcard
+   - [ ] zcount
+   - [ ] zincrby
+   - [ ] zinterstore
+   - [ ] zlexcount
+   - [ ] zrange
+   - [ ] zrangebylex
+   - [ ] zrevrangebylex
+   - [ ] zrangebyscore
+   - [ ] zrank
+   - [ ] zrem
+   - [ ] zremrangebylex
+   - [ ] zremrangebyrank
+   - [ ] zremrangebyscore
+   - [ ] zrevrange
+   - [ ] zrevrangebyscore
+   - [ ] zrevrank
+   - [ ] zscore
+   - [ ] zunionstore
+   - [ ] zscan
+
+HyperLogLog, Pub/Sub, Transactions, and Scripting will be implemented once I implement more of the things above.
