@@ -534,6 +534,21 @@ var Redis = (function() {
         });
     };
 
+    Cursor.prototype.blpop = function() {
+        var args = Array.prototype.slice.call(arguments);
+        var keys = args.slice(0, args.length-1);
+        var timeout = args[args.length-1];
+    };
+
+    Cursor.prototype.brpop = function() {
+        var args = Array.prototype.slice.call(arguments);
+        var keys = args.slice(0, args.length-1);
+        var timeout = args[args.length-1];
+    };
+    
+    Cursor.prototype.brpoplpush = function(source, destination timeout) {
+    };
+
     function easy_connect(options) {
         return new Cursor(new LocalStoragePlugin());
     }

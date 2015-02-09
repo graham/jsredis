@@ -74,13 +74,9 @@ Sets:
 Strings:
 
    - [x] append
-   - [ ] bitcount
-   - [ ] bitop
-   - [ ] bitpos
    - [x] decr
    - [x] decrby
    - [x] get
-   - [ ] getbit
    - [x] getrange
    - [ ] getset
    - [x] incr
@@ -91,11 +87,18 @@ Strings:
    - [x] msetnx
    - [ ] psetex
    - [x] set
-   - [ ] setbit
    - [ ] setex
    - [x] setnx
    - [ ] setrange
    - [x] strlen
+   - [ ] getbit
+
+Bit Ops (harder to do in js):
+
+   - [ ] bitcount
+   - [ ] bitop
+   - [ ] bitpos
+   - [ ] setbit
 
 Hashes:
 
