@@ -69,13 +69,13 @@ var Beacon = (function() {
     Beacon.prototype.fire = function(name) {
         if (this.obs[name] != undefined) {
             var ll = this.obs[name];
-            var args = [this.obs[2]].concat(arguments); //slice.call(arguments, 1)
+            var args = [name].concat(arguments); //slice.call(arguments, 1)
             this.obs[name] = this.publish_event_to_list(ll, args);
         }
 
         if (this.obs['*'] != undefined) {
             var ll = this.obs['*'];
-            var args = [this.obs[2]].concat(arguments); //slice.call(arguments, 1)
+            var args = [name].concat(arguments); //slice.call(arguments, 1)
             this.obs['*'] = this.publish_event_to_list(ll, args);
         }
     };
@@ -168,4 +168,8 @@ PromiseValue.prototype.reject = function(err) {
 
 var Next = function() {
     return new PromiseValue();
+};
+
+var BufferedRead = function() {
+    
 };

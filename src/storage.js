@@ -3,6 +3,131 @@ var l = function() {
 }
 
 var Redis = (function() {
+    var InterruptTimer = function(callback, timeout) {
+        this.callback = callback;
+        this.timeout = timeout;
+        this.timeout_id = null;
+        this.has_called = false;
+    };
+    
+    InterruptTimer.prototype.start = function() {
+        var _this = this;
+        if (this.timeout > 0) {
+            this.timeout_id = setTimeout(function() { _this.cancel(); }, this.timeout);
+        }        
+    };
+    
+    InterruptTimer.prototype.cancel = function() {
+        if (this.has_called) {
+            return
+        }
+        this.has_called = true;
+        clearTimeout(this.timeout_id);
+        this.callback(undefined);
+    };
+    
+    InterruptTimer.prototype.fire = function(value) {
+        if (this.has_called) {
+            return
+        }
+        this.has_called = true;
+        clearTimeout(this.timeout_id);
+        this.callback(value);
+    };
+
+    var x_in_list = function(x, the_list) {
+        var l = the_list.length;
+        for(var i = 0; i < l; i += 1) {
+            if (x == the_list[i]) {
+                return true;
+            }
+        }
+        return false;
+    };
+    
+    var remove_x_from_list = function(x, the_list) {
+        var new_list = [];
+        for(var i = 0; i < the_list.length; i += 1) {
+            if (x != the_list[i]) {
+                new_list.push(the_list[i]);
+            }
+        }
+        return new_list;
+    };
+
+    var Beacon = function() {
+        this.obs = {};
+        this.to_remove = [];
+        this.obs_id = 1;
+    };
+
+    Beacon.prototype.next_id = function() {
+        this.obs_id += 1;
+        return this.obs_id;
+    };
+
+    Beacon.prototype.smart_add = function(name, o) {
+        if (this.obs[name] == undefined) {
+            this.obs[name] = [o];
+        } else {
+            this.obs[name].push(o);
+        }
+    };
+
+    Beacon.prototype.on = function(name, cb) {
+        var uid = this.next_id();
+        this.smart_add(name, [cb, true, uid]);
+        return uid;
+    };
+
+    Beacon.prototype.once = function(name, cb) {
+        var uid = this.next_id();
+        this.smart_add(name, [cb, false, uid]);
+        return uid;
+    };
+
+    Beacon.prototype.fire = function(name) {
+        if (this.obs[name] != undefined) {
+            var ll = this.obs[name];
+            var args = [name].concat(arguments); //slice.call(arguments, 1)
+            this.obs[name] = this.publish_event_to_list(ll, args);
+        }
+
+        if (this.obs['*'] != undefined) {
+            var ll = this.obs['*'];
+            var args = [name].concat(arguments); //slice.call(arguments, 1)
+            this.obs['*'] = this.publish_event_to_list(ll, args);
+        }
+    };
+
+    Beacon.prototype.publish_event_to_list = function(ll, args) {
+        var new_list = [];
+        var now_final = false;
+        
+        for(var i = 0; i < ll.length; i += 1) {
+            if (x_in_list(ll[i][2], this.to_remove)) {
+                // pass, either it's not a continue, or it's in the remove list.
+                this.to_remove = remove_x_from_list(ll[i][2], to_remove);
+            } else {
+                now_final = ll[i][0].apply(null, args);
+                if (now_final != false) {
+                    if (ll[i][1]) {
+                        new_list.push(ll[i]);
+                    }    
+                }
+            }
+        }
+        return new_list;
+    };
+
+    Beacon.prototype.reset = function() {
+        this.obs = {};
+    };
+
+    var remove = function(uid) {
+        this.to_remove.push(uid);
+    };
+    
     Promise.prototype.log = function() {
         this.then(function(args) {
             console.log("Resolve: " + args);
@@ -26,6 +151,8 @@ var Redis = (function() {
         } else {
             this.conn = localStorage;
         }
+
+        this.update_beacon = new Beacon();
         this.init();
     };
 
@@ -51,6 +178,7 @@ var Redis = (function() {
         return new Promise(function(resolve, reject) {
             plugin.conn.setItem(key, value);
             resolve(value);
+            plugin.update_beacon.fire(key);
         });
     };
 
@@ -73,6 +201,7 @@ var Redis = (function() {
                 plugin.conn.setItem(key, new_value);
             }
             resolve(return_value);
+            plugin.update_beacon.fire(key);
             return return_value;
         });
     };
@@ -97,6 +226,7 @@ var Redis = (function() {
     }
 
     var Cursor = function(plugin) {
+        this.blocked_reads = [];
         this.plugin = plugin;
         this.command_queue = [];
         this.looper = null;
@@ -109,12 +239,33 @@ var Redis = (function() {
     };
 
     Cursor.prototype.init = function() {
+        var _this = this;
         this.plugin.init();
         this.ready = new Promise(function(resolve, reject) {
             resolve();
         });
+        this.plugin.update_beacon.on('*', function(key) {
+            _this.handle_update(key);
+        });
     };
 
+    Cursor.prototype.queue_read = function(keys, callback) {
+        this.blocked_reads.push([keys, callback]);
+    };
+
+    Cursor.prototype.handle_update = function(key) {
+        var new_blocks = [];
+        for(var i=0; i < this.blocked_reads.length; i++) {
+            var block = this.blocked_reads[i];
+            if (x_in_list(key, block[0])) {
+                block[1](key);
+            } else {
+                new_blocks.push(block);
+            }
+        }
+        this.blocked_reads = new_blocks;
+    };
+    
     Cursor.prototype.get = function(key) {
         return this.plugin.get(key);
     };
@@ -533,37 +684,34 @@ var Redis = (function() {
             });
         });
     };
-
     
-
-
-
-
-
-    
-
     Cursor.prototype.blpop = function() {
+        var _this = this;
         var args = Array.prototype.slice.call(arguments);
         var keys = args.slice(0, args.length-1);
         var timeout = args[args.length-1];
+
+        return new Promise(function(resolve, reject) {
+            _this.queue_read(keys, function(key) {
+                resolve(_this.lpop(key));
+            });
+        });
     };
 
-    Cursor.prototype.brpop = function() {
-        var args = Array.prototype.slice.call(arguments);
-        var keys = args.slice(0, args.length-1);
-        var timeout = args[args.length-1];
-    };
-    
-    Cursor.prototype.brpoplpush = function(source, destination timeout) {
-    };
+    Cursor.prototype.brpop = function() {};
+    Cursor.prototype.brpoplpush = function(source, destination, timeout) {};
 
     function easy_connect(options) {
         return new Cursor(new LocalStoragePlugin());
     }
 
+
     return {
         'Cursor'             : Cursor,
         'LocalStoragePlugin' : LocalStoragePlugin,
-        'connect'            : easy_connect
+        'connect'            : easy_connect,
+        'InterruptTimer'     : InterruptTimer,
+        'Beacon'             : Beacon
+        
     };
 })();
