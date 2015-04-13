@@ -3,6 +3,16 @@ var l = function() {
 }
 
 var Redis = (function() {
+    function generateUUID(){
+        var d = new Date().getTime();
+        var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = (d + Math.random()*16)%16 | 0;
+            d = Math.floor(d/16);
+            return (c=='x' ? r : (r&0x3|0x8)).toString(16);
+        });
+        return uuid;
+    };
+    
     var InterruptTimer = function(callback, timeout) {
         this.callback = callback;
         this.timeout = timeout;
@@ -39,6 +49,16 @@ var Redis = (function() {
         var l = the_list.length;
         for(var i = 0; i < l; i += 1) {
             if (x == the_list[i]) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    var any_in_list = function(first_list, second_list) {
+        for(var i=0; i < first_list.length; i++) {
+            var left = first_list[i];
+            if (x_in_list(left, second_list)) {
                 return true;
             }
         }
@@ -178,7 +198,6 @@ var Redis = (function() {
         return new Promise(function(resolve, reject) {
             plugin.conn.setItem(key, value);
             resolve(value);
-            plugin.update_beacon.fire(key);
         });
     };
 
@@ -201,7 +220,6 @@ var Redis = (function() {
                 plugin.conn.setItem(key, new_value);
             }
             resolve(return_value);
-            plugin.update_beacon.fire(key);
             return return_value;
         });
     };
@@ -226,7 +244,6 @@ var Redis = (function() {
     }
 
     var Cursor = function(plugin) {
-        this.blocked_reads = [];
         this.plugin = plugin;
         this.command_queue = [];
         this.looper = null;
@@ -244,28 +261,8 @@ var Redis = (function() {
         this.ready = new Promise(function(resolve, reject) {
             resolve();
         });
-        this.plugin.update_beacon.on('*', function(key) {
-            _this.handle_update(key);
-        });
     };
 
-    Cursor.prototype.queue_read = function(keys, callback) {
-        this.blocked_reads.push([keys, callback]);
-    };
-
-    Cursor.prototype.handle_update = function(key) {
-        var new_blocks = [];
-        for(var i=0; i < this.blocked_reads.length; i++) {
-            var block = this.blocked_reads[i];
-            if (x_in_list(key, block[0])) {
-                block[1](key);
-            } else {
-                new_blocks.push(block);
-            }
-        }
-        this.blocked_reads = new_blocks;
-    };
-    
     Cursor.prototype.get = function(key) {
         return this.plugin.get(key);
     };
@@ -523,7 +520,6 @@ var Redis = (function() {
                 if (index < 0) {
                     index = prev_value.length + index;
                 }
-                
                 prev_value[index] = value
                 return [JSON.stringify(prev_value), prev_value.length];
             }).then(function(value) {
@@ -685,33 +681,43 @@ var Redis = (function() {
         });
     };
     
-    Cursor.prototype.blpop = function() {
-        var _this = this;
-        var args = Array.prototype.slice.call(arguments);
-        var keys = args.slice(0, args.length-1);
-        var timeout = args[args.length-1];
-
-        return new Promise(function(resolve, reject) {
-            _this.queue_read(keys, function(key) {
-                resolve(_this.lpop(key));
-            });
-        });
-    };
-
-    Cursor.prototype.brpop = function() {};
-    Cursor.prototype.brpoplpush = function(source, destination, timeout) {};
-
     function easy_connect(options) {
         return new Cursor(new LocalStoragePlugin());
     }
 
+    var Connection = function() {
+        this.blocked_reads = [];
+        this.command_queue = [];
+    };
 
+    Connection.prototype.on_change = function(keys, callback) {
+        var uuid = generateUUID();
+        var _this = this;
+        this.blocked_reads.push([keys, callback]);
+        return uuid;
+    };
+
+    Connection.prototype.handle_update = function(key) {
+        var hit = false;
+        var new_blocks = [];
+        for(var i=0; i < this.blocked_reads.length; i++) {
+            var block = this.blocked_reads[i];
+            if (hit == false && x_in_list(key, block[0])) {
+                block[1](key);
+                hit = true;
+            } else {
+                new_blocks.push(block);
+            }
+        }
+        this.blocked_reads = new_blocks;
+    };
+    
     return {
         'Cursor'             : Cursor,
         'LocalStoragePlugin' : LocalStoragePlugin,
         'connect'            : easy_connect,
         'InterruptTimer'     : InterruptTimer,
-        'Beacon'             : Beacon
-        
+        'Beacon'             : Beacon,
+        'Connection'         : Connection
     };
 })();
