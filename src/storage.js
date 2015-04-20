@@ -67,6 +67,10 @@ Cursor.prototype._process = function() {
     });
 };
 
+Cursor.prototype.all = function(funcs) {
+    return Promise.all(funcs);
+};
+
 var Redis = {};
-Redis['connect'] = function() { return new Cursor( new Connector_LocalStorage() ); };
+Redis['connect'] = function() { return new Cursor( new Connector_IndexStorage() ); };
 

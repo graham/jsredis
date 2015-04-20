@@ -13,19 +13,19 @@ Task list, only completed if there is a test that passes :)
 
 Simple stuff for any KVS:
 
-   - [x] get
-   - [x] set
-   - [x] reset db
-   - [x] exists
-   - [x] keys
-   - [x] batch commands
-   - [x] del
+   - [ ] get
+   - [ ] set
+   - [ ] reset db
+   - [ ] exists
+   - [ ] keys
+   - [ ] batch commands
+   - [ ] del
    - [ ] transactions
    - [ ] db lock (for multiple tabs).
 
 Plugins:
 
-   - [x] localStorge / sessionStorage
+   - [ ] localStorge / sessionStorage
    - [ ] IndexedDB
 
 ## Redis Commands:
@@ -34,8 +34,8 @@ All Keys:
 
    - [ ] expire
    - [ ] presist
-   - [x] rename
-   - [x] renamenx
+   - [ ] rename
+   - [ ] renamenx
    - [ ] type
 
 Lists:
@@ -43,41 +43,41 @@ Lists:
    - [ ] blpop
    - [ ] brpop
    - [ ] brpoplpush
-   - [x] lindex
-   - [x] linsert
-   - [x] llen
-   - [x] lpop
-   - [x] lpush
-   - [x] lpushx
-   - [x] lrange
+   - [ ] lindex
+   - [ ] linsert
+   - [ ] llen
+   - [ ] lpop
+   - [ ] lpush
+   - [ ] lpushx
+   - [ ] lrange
    - [ ] lrem
-   - [x] lset
-   - [x] ltrim
-   - [x] rpop
-   - [x] rpoplpush
-   - [x] rpush
-   - [x] rpushx
+   - [ ] lset
+   - [ ] ltrim
+   - [ ] rpop
+   - [ ] rpoplpush
+   - [ ] rpush
+   - [ ] rpushx
 
 Strings:
 
-   - [x] append
-   - [x] decr
-   - [x] decrby
-   - [x] get
-   - [x] getrange
+   - [ ] append
+   - [ ] decr
+   - [ ] decrby
+   - [ ] get
+   - [ ] getrange
    - [ ] getset
-   - [x] incr
-   - [x] incrby
+   - [ ] incr
+   - [ ] incrby
    - [ ] incrbyfloat
-   - [x] mget
-   - [x] mset
-   - [x] msetnx
+   - [ ] mget
+   - [ ] mset
+   - [ ] msetnx
    - [ ] psetex
-   - [x] set
+   - [ ] set
    - [ ] setex
-   - [x] setnx
+   - [ ] setnx
    - [ ] setrange
-   - [x] strlen
+   - [ ] strlen
 
 Bit Ops (harder to do in js):
 

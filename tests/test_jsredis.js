@@ -1,5 +1,9 @@
 var conn = null;
 
+var Next = function() {
+    return new Promise(function(resolve, reject) { resolve(); });
+}
+
 // from: http://stackoverflow.com/questions/105034/create-guid-uuid-in-javascript
 function generateUUID(){
     var d = new Date().getTime();
@@ -35,13 +39,11 @@ describe("Simple Index Functions", function() {
     });
 
     it("exists; check if key exists.", function(done) {
-        conn.exists('test').then(function(exists) {
+        conn.cmd('exists', 'test').then(function(exists) {
             expect(exists).toEqual(false);
-            return Next().resolve();
-        }).then(function() {
             conn.all([
-                conn.set('test', 'value'),
-                conn.exists('test')
+                conn.cmd('set', 'test', 'value'),
+                conn.cmd('exists', 'test')
             ]).then(function(values) {
                 expect(values[1]).toEqual(true);
                 done();
@@ -50,23 +52,24 @@ describe("Simple Index Functions", function() {
     });
 
     it("del; can delete keys.", function(done) {
-        conn.exists('key').then(function(exists) {
+        conn.cmd('exists', 'key').then(function(exists) {
             expect(exists).toEqual(false);
-            return Next().resolve();
+            return Next();
         }).then(function() {
-            return conn.set('key','value');            
+            return conn.cmd('set', 'key','value');            
         }).then(function() {
-            return conn.get('key')
+            return conn.cmd('set', 'key');
         }).then(function() {
-            return conn.del('key');
+            return conn.cmd('del', 'key');
         }).then(function() {
-            conn.get('key').then(function(value) {
+            conn.cmd('get', 'key').then(function(value) {
                 expect(value).toEqual(undefined);
                 done();
             });
         });
     });
 
+    
     it("keys; return list of all keys in db.", function(done) {
         conn.all([
             conn.set('key1', 1),
@@ -316,4 +319,5 @@ describe("JSRedis String Functions", function() {
             done();
         });
     });
+
 });
