@@ -1,4 +1,5 @@
 var conn = null;
+
 // from: http://stackoverflow.com/questions/105034/create-guid-uuid-in-javascript
 function generateUUID(){
     var d = new Date().getTime();
@@ -10,88 +11,6 @@ function generateUUID(){
     return uuid;
 };
 
-describe("InterruptTimer tests", function() {
-    beforeEach(function(done) {
-        conn = Redis.connect();
-        conn.ready.then(function() {
-            done();
-        });            
-    });
-
-    afterEach(function(done) {
-        conn.flushdb().then(function() {
-            done();
-        });
-    });
-
-    it("timeouts should work.", function(done) {
-        var did_fire = null;
-        var did_timeout = null;
-
-        var do_fire = function(value) {
-            if (value == undefined) {
-                did_timeout = true;
-            } else {
-                did_fire = true;
-            }
-        }
-        
-        var one = new InterruptTimer(do_fire, 1);
-        one.start();
-        
-        setTimeout(function() {
-            expect(did_timeout).toEqual(true);
-            done();
-        }, 100);
-    });
-
-    it("Make sure value calls correctly if the fire method is called.", function(done) {
-        var did_fire = null;
-        var did_timeout = null;
-        var do_fire = function(value) {
-            if (value == undefined) {
-                did_timeout = true;
-            } else {
-                did_fire = true;
-            }
-        }
-        
-        var one = new InterruptTimer(do_fire, 100);
-        one.start();
-
-        setTimeout(function() {
-            one.fire('boom');
-        }, 10);
-        
-        setTimeout(function() {
-            expect(did_fire).toEqual(true);
-            done();
-        }, 50);
-    });
-
-    it("ensure only one method gets called.", function(done) {
-        var did_fire = null;
-        var did_timeout = null;
-        var do_fire = function(value) {
-            if (value == undefined) {
-                did_timeout = true;
-            } else {
-                did_fire = true;
-            }
-        }
-        
-        var one = new InterruptTimer(do_fire, 10);
-        one.start();
-        one.fire('asdf');
-        one.cancel();
-
-        expect(did_fire).toEqual(true);
-        expect(did_timeout).toEqual(null);
-        done();
-    });
-
-});
-
 describe("Simple Index Functions", function() {
     beforeEach(function(done) {
         conn = Redis.connect();
@@ -101,14 +20,14 @@ describe("Simple Index Functions", function() {
     });
 
     afterEach(function(done) {
-        conn.flushdb().then(function() {
+        conn.cmd('flushdb').then(function() {
             setTimeout(done, 100);
         });
     });
 
     it("get and set; should be able to get and set keys.", function(done) {
-        conn.set('test', 'value').then(function() {
-            conn.get('test').then(function(value) {
+        conn.cmd('set', 'test', 'value').then(function() {
+            conn.cmd('get', 'test').then(function(value) {
                 expect(value).toEqual('value');
                 done();
             });
@@ -184,20 +103,20 @@ describe("JSRedis String Functions", function() {
     });
 
     afterEach(function(done) {
-        conn.flushdb().then(function() {
+        conn.cmd('flushdb').then(function() {
             done();
         });
     });
 
     it("get and set; get and set keys.", function(done) {
-        conn.set('test', 'aweso').then(function(data) {
+        conn.cmd('set', 'test', 'aweso').then(function(data) {
             expect(data).toEqual('aweso');
             done();
         });
     });
 
     it("lpush and rpush; append and prepend to a list.", function(done) {
-        conn.exists('mylist').then(function(result) {
+        conn.cmd('exists', 'mylist').then(function(result) {
             expect(result).toEqual(false);
 
             Promise.all([

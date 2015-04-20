@@ -1,5 +1,4 @@
 var Connector = function() {};
-var Connector_LocalStorage = function() {};
 
 Connector.prototype.run = function(args) {
     return new Promise(function(resolve, reject) {
@@ -7,35 +6,59 @@ Connector.prototype.run = function(args) {
     });
 };
 
+var Connector_LocalStorage = function() {
+    this.ready = new Promise(function(resolve, reject) {
+        resolve();
+    });
+};
+
 Connector_LocalStorage.prototype.run = function(args) {
     var command = args[0];
-    var key = null;
 
-    if (command == 'get') {
-        key = args[1];
-        return new Promise( function(resolve, reject) {
-            resolve(localStorage.getItem(key));
-        });
-    } else if (command == 'set') {
-        key = args[1];
-        var value = args[2];
-        return new Promise( function(resolve, reject) {
-            var hit = localStorage.getItem(key) != undefined;
-            localStorage.setItem(key, value);
-            resolve(hit);
-        });
-    } else if (command == 'keys') {
-        return new Promise(function(resolve, reject) {
-            var keys = [];
-            for (var key in localStorage) {
-                keys.push(key);
-            }
-            resolve(keys);
-        });
+    var callback = this['cmd_' + command];
+
+    if (callback != undefined) {
+        return callback(args);
     } else {
-        console.log("Unknown command: " + args);
+        throw "Command not found: " + command;
     }
 };
+
+Connector_LocalStorage.prototype.cmd_get = function(args) {
+    var key = args[1];
+    return new Promise( function(resolve, reject) {
+        resolve(localStorage.getItem(key));
+    });
+};
+
+Connector_LocalStorage.prototype.cmd_set = function(args) {
+    var key = args[1];
+    var value = args[2];
+    return new Promise( function(resolve, reject) {
+        var hit = localStorage.getItem(key) != undefined;
+        localStorage.setItem(key, value);
+        resolve(hit);
+    });
+};
+
+Connector_LocalStorage.prototype.cmd_keys = function(args) {
+    return new Promise(function(resolve, reject) {
+        var keys = [];
+        for (var key in localStorage) {
+            keys.push(key);
+        }
+        resolve(keys);
+    });
+};
+
+Connector_LocalStorage.prototype.cmd_flushdb = function(args) {
+    return new Promise(function(resolve, reject) {
+        localStorage.clear();
+        resolve();
+    });
+};
+
+/* ******************************************************** */
 
 var Connector_IndexStorage = function() {
     var _this = this;

@@ -28,6 +28,7 @@ var Cursor = function(connector) {
     this.command_queue = [];
     this.blocking_calls = [];
     this.timeout_runner = null;
+    this.ready = this.connector.ready;
 };
 
 Cursor.prototype.cmd = function() {
@@ -65,4 +66,7 @@ Cursor.prototype._process = function() {
         _this._process();
     });
 };
+
+var Redis = {};
+Redis['connect'] = function() { return new Cursor( new Connector_LocalStorage() ); };
 
