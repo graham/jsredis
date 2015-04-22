@@ -28,7 +28,7 @@ var Cursor = function(connector) {
     this.command_queue = [];
     this.blocking_calls = [];
     this.timeout_runner = null;
-    this.ready = this.connector.ready;
+    this.ready = connector.ready;
 };
 
 Cursor.prototype.cmd = function() {

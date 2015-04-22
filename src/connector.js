@@ -177,7 +177,7 @@ Connector_IndexStorage.prototype.cmd_set = function(_this, args, tx, store, inde
         var request = index.openCursor(IDBKeyRange.only(key));
         request.onsuccess = function() {
             var cursor = request.result;
-            var new_value = {'key':key, 'value':value, 'type':value.constructor.name};
+            var new_value = {'key':key, 'value':value, 'type':''};
             
             if (cursor) {
                 cursor.update(new_value);
@@ -209,3 +209,54 @@ Connector_IndexStorage.prototype.cmd_keys = function(_this, args, tx, store, ind
         };
     });
 };
+
+Connector_IndexStorage.prototype.cmd_exists = function(_this, args, tx, store, index) {
+    var key = args[0];
+    return new Promise(function(resolve, reject) {
+        var request = index.get(key);
+        request.onsuccess = function() {
+            var match = request.result;
+            if (match) {
+                resolve(true);
+            } else {
+                resolve(false);
+            }
+        }
+        request.onerror = function() {
+            reject(key);
+        }
+    });
+};
+
+Connector_IndexStorage.prototype.cmd_flushdb = function(_this, args, tx, store, index) {
+    var key = args[0];
+    return new Promise(function(resolve, reject) {
+        var request = store.clear();
+        request.onsuccess = function() {
+            resolve(true);
+        }
+        request.onerror = function() {
+            reject(false);
+        }
+    });
+};
+
+Connector_IndexStorage.prototype.cmd_del = function(_this, args, tx, store, index) {
+    var key = args[0];
+    return new Promise(function(resolve, reject) {
+        var request = index.get(key);
+        request.onsuccess = function() {
+            var match = request.result;
+            if (match) {
+                store.delete(key);
+                resolve(true);
+            } else {
+                resolve(false);
+            }
+        }
+        request.onerror = function() {
+            reject(key);
+        }
+    });
+};
+
