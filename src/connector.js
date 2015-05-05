@@ -1,4 +1,28 @@
-var Connector = function() {};
+var general_failure = function(promise, conn, args) {
+    console.log("Promise Failure: " + promise + " with " + args);
+};
+
+var Connector = function() {
+    this.change_event_manager = [];
+    this.add_change_event_manager = [];
+};
+
+Connector.prototype.key_changed = function(key) {
+    console.log("Key `" + key + "` has changed.");
+    // alert that a key has changed in some way.
+};
+
+Connector.prototype.unblocking_key_change = function(key) {
+    // A special kind of change that 'might' unblock a blocking call.
+    // This will call key_changed when done.
+
+    // This should only be called when a list is added to (because
+    // blocking methods currently only work on lists). However,
+    // there should be no penalty other than speed (it's ok if you
+    // call it on an empty list, nothing should happen.
+
+    this.key_changed(key);
+};
 
 Connector.prototype.run = function(args) {
     return new Promise(function(resolve, reject) {
@@ -6,11 +30,57 @@ Connector.prototype.run = function(args) {
     });
 };
 
+// Lets do some commands.
+// Need more error checking here, if the json encode fails it'll do so silently.
+Connector.prototype.cmd_jset = function(_this, args) {
+    return new Promise(function(resolve, reject) {
+        var key = args[0];
+        var json_data = JSON.stringify(args[1]);
+        _this.run(['set', key, json_data]).then(function() {
+            resolve();
+        }, function(more) {
+            general_failure(more, _this, args);
+        });
+    });
+};
+
+Connector.prototype.cmd_jget = function(_this, args) {
+    return new Promise(function(resolve, reject) {
+        var key = args[0];
+        _this.run(['get', key]).then(function(data) {
+            resolve(JSON.parse(data));
+        }, function(more) {
+            general_failure(more, _this, args);
+        });
+    });
+};
+
+Connector.prototype.cmd_jmod = function(_this, args) {
+    return new Promise(function(resolve, reject) {
+        var key = args[0];
+        var func = args[1];
+        _this.run(['get', key]).then(function(data) {
+            try {
+                var new_value = func(JSON.parse(data));
+            } catch (e) {
+                reject(e, _this, args);
+                return
+            }
+            _this.run(['set', key, JSON.stringify(new_value)]).then(function() {
+                resolve(new_value);
+            });
+        }, function(more) {
+            general_failure(more, _this, args);
+        });
+    });
+};
+
 Connector.prototype.cmd_lpush = function(_this, args) {
     return new Promise(function(resolve, reject) {
-        _this.cmd_get(_this, [args[0]]).then(function(data) {
+        _this.run(['get', args[0]]).then(function(data) {
             if (data == undefined) {
-                _this.cmd_set(_this, [args[0], '!' + JSON.stringify(args.slice(1))]).then(function() {
+                _this.run(['set', args[0], '!' + JSON.stringify(args.slice(1))]).then(function() {
+                    _this.unblocking_key_change(args[0]);
                     resolve();
                 });
             } else if (data[0] != '!') {
@@ -18,7 +88,8 @@ Connector.prototype.cmd_lpush = function(_this, args) {
             } else {
                 var prev = JSON.parse(data.slice(1));
                 var next = args.slice(1).concat(prev);
-                _this.cmd_set(_this, [args[0], '!' + JSON.stringify(next)]).then(function() {
+                _this.run(['set', args[0], '!' + JSON.stringify(next)]).then(function() {
+                    _this.unblocking_key_change(args[0]);                    
                     resolve();
                 });
             }
@@ -101,9 +172,6 @@ Connector_LocalStorage.prototype.cmd_del = function(_this, args) {
         localStorage.removeItem(key);
         resolve();
     });
-};
-
-Connector_LocalStorage.prototype.cmd_rpush = function(_this, args) {
 };
 
 /* ******************************************************** */

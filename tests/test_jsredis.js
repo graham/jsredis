@@ -16,7 +16,7 @@ function generateUUID(){
 };
 
 function do_tests(connector_constructor, name) {
-    describe("Simple Index Functions: " + name, function() {
+    describe("Core Connector Functions: " + name, function() {
         beforeEach(function(done) {
             conn = new Cursor( new connector_constructor());
             conn.ready.then(function() {
@@ -96,6 +96,71 @@ function do_tests(connector_constructor, name) {
                 });
             });
         });
+    });
+
+    describe("High Level Functions: " + name, function() {
+        beforeEach(function(done) {
+            conn = new Cursor( new connector_constructor());
+            conn.ready.then(function() {
+                done();
+            });            
+        });
+
+        afterEach(function(done) {
+            conn.cmd('flushdb').then(function() {
+                setTimeout(done, 2);
+            });
+        });
+
+        it("get and set; should be able to get and set keys.", function(done) {
+            conn.cmd('set', 'test', 'value').then(function() {
+                conn.cmd('get', 'test').then(function(value) {
+                    expect(value).toEqual('value');
+                    done();
+                });
+            });
+        });
+
+    });
+
+    describe("Nice functions not found in redis: " + name, function() {
+        beforeEach(function(done) {
+            conn = new Cursor( new connector_constructor());
+            conn.ready.then(function() {
+                done();
+            });            
+        });
+
+        afterEach(function(done) {
+            conn.cmd('flushdb').then(function() {
+                setTimeout(done, 2);
+            });
+        });
+
+        it("jget and jset for json objects", function(done) {
+            conn.cmd('jset', 'test', [1,2,3]).then(function() {
+                conn.cmd('jget', 'test').then(function(value) {
+                    expect(value).toEqual([1,2,3]);
+                    done();
+                });
+            });
+        });
+
+        it("jmod; nice way to atomically modify json objects.", function(done) {
+            conn.all([
+                conn.cmd('jset', 'test', {'sss':[]}),
+                conn.cmd('jmod', 'test', function(data) {
+                    data['sss'].push(1);
+                    return data;
+                })                
+            ]).then(function() {
+                conn.cmd('jget', 'test').then(function(value) {
+                    expect(value).toEqual({'sss':[1]});
+                    done();
+                });
+            });
+        });
+
     });
 }
 
