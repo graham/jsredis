@@ -1,0 +1,101 @@
+<html>
+  <head>
+    <script src='src/jsredis.js'> </script>
+  </head>
+  <body>
+  
+  <div id='status'>Running...</div>
+  <table width="600px" style='text-align:right;'>
+    <thead>
+      <th>Test</th>
+      <th>Conn</th>
+      <th>Time</th>
+      <th>Ops</th>
+    </thead>
+
+    <tbody id='thebody'>
+    </tbody>
+  </table>
+  
+  </body>
+  <script>
+    
+   var c = jsredis.connect('local');
+   var c2 = jsredis.connect('indexdb');
+   var ITERATION = 5000;
+   
+   function timeit(name, conn, func, inner_done) {
+       var start = new Date().getTime();
+       var done = function() {
+           var end = ((new Date().getTime())-start);
+           var ratio = Math.floor((1000 / end) * ITERATION);
+           var d = "<td>" + name + "</td><td>" + conn.type + "</td><td>" + end + "</td><td>" + (ratio) + "</td>";
+           console.log([name, end]);
+           var dd = document.createElement('tr');
+           dd.innerHTML = d;
+           document.getElementById('thebody').appendChild(dd);
+           inner_done();
+       }
+       func(conn, done);
+   }
+
+   var tests = [];
+
+   function run_next_test() {
+       if (tests.length == 0) {
+           document.getElementById('status').innerHTML = 'Done.';
+           return;
+       }
+
+       var next_test = tests.slice(0, 1)[0];
+       tests = tests.slice(1);
+
+       timeit(next_test[0], next_test[1], next_test[2], function() {
+           setTimeout(function() {
+               run_next_test();
+           }, 2500);
+       });
+   }
+
+   function add_test(name, func) {
+       tests.push( [name, c, func] );
+       tests.push( [name, c2, func] );
+   }
+
+
+   add_test('basic get set: ' + ITERATION, function(conn, done) {
+       for(var i = 0; i < ITERATION ; i++) {
+           conn.cmd('set', 'key', 'value');
+           conn.cmd('get', 'key');
+       }
+       conn.cmd('get', 'key').then(function() {
+           done();
+       });
+   });
+
+   add_test('jget jset: ' + ITERATION, function(conn, done) {
+       for(var i = 0; i < ITERATION ; i++) {
+           conn.cmd('jset', 'key', {'one':1, 'two':2});
+           conn.cmd('jget', 'key');
+       }
+       conn.cmd('jget', 'key').then(function() {
+           done();
+       });
+   });
+
+   add_test('japply: ' + ITERATION, function(conn, done) {
+       conn.cmd('jset', 'key', {'one':1});
+       for(var i = 0; i < ITERATION ; i++) {
+           conn.cmd('japply', 'key', function(value) {
+               value['one'] += 1;
+               return value;
+           });
+       }
+       conn.cmd('jget', 'key').then(function() {
+           done();
+       });
+   });
+
+   run_next_test();   
+  </script>
+</html>

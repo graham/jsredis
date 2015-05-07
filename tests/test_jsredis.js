@@ -18,7 +18,7 @@ function generateUUID(){
 function do_tests(connector_constructor, name) {
     describe("Core Connector Functions: " + name, function() {
         beforeEach(function(done) {
-            conn = new Cursor( new connector_constructor());
+            conn = new jsredis.Cursor( new connector_constructor());
             conn.ready.then(function() {
                 done();
             });            
@@ -100,7 +100,7 @@ function do_tests(connector_constructor, name) {
 
     describe("High Level Functions: " + name, function() {
         beforeEach(function(done) {
-            conn = new Cursor( new connector_constructor());
+            conn = new jsredis.Cursor( new connector_constructor());
             conn.ready.then(function() {
                 done();
             });            
@@ -125,7 +125,7 @@ function do_tests(connector_constructor, name) {
 
     describe("Nice functions not found in redis: " + name, function() {
         beforeEach(function(done) {
-            conn = new Cursor( new connector_constructor());
+            conn = new jsredis.Cursor( new connector_constructor());
             conn.ready.then(function() {
                 done();
             });            
@@ -146,10 +146,10 @@ function do_tests(connector_constructor, name) {
             });
         });
 
-        it("jmod; nice way to atomically modify json objects.", function(done) {
+        it("japply; nice way to atomically apply a function to json objects.", function(done) {
             conn.all([
                 conn.cmd('jset', 'test', {'sss':[]}),
-                conn.cmd('jmod', 'test', function(data) {
+                conn.cmd('japply', 'test', function(data) {
                     data['sss'].push(1);
                     return data;
                 })                
@@ -160,9 +160,37 @@ function do_tests(connector_constructor, name) {
                 });
             });
         });
+    });
+
+    describe("List Functions: " + name, function() {
+        beforeEach(function(done) {
+            conn = new jsredis.Cursor( new connector_constructor());
+            conn.ready.then(function() {
+                done();
+            });            
+        });
+
+        afterEach(function(done) {
+            conn.cmd('flushdb').then(function() {
+                setTimeout(done, 2);
+            });
+        });
+
+        it("lpush and rpush: add to list, at head and tail", function(done) {
+            conn.all([
+                conn.cmd('rpush', 'key', 'one'),
+                conn.cmd('rpush', 'key', 'two'),
+                conn.cmd('lpush', 'key', 'zero')
+            ]).then(function() {
+                conn.cmd('get', 'key').then(function(values) {
+                    expect(values).toEqual('!["zero","one","two"]');
+                    done();
+                });
+            });
+        });
 
     });
 }
 
-do_tests(Connector_LocalStorage, "Local Storage");
-do_tests(Connector_IndexStorage, "IndexDB Storage");
+do_tests(jsredis.Connector_LocalStorage, "Local Storage");
+do_tests(jsredis.Connector_IndexStorage, "IndexDB Storage");
