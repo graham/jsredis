@@ -189,6 +189,22 @@ function do_tests(connector_constructor, name) {
             });
         });
 
+        it("lpop and rpop: remove from list from head or tail.", function(done) {
+            conn.all([
+                conn.cmd('rpush', 'key', 'one'),
+                conn.cmd('rpush', 'key', 'two'),
+                conn.cmd('lpush', 'key', 'zero'),
+                conn.cmd('lpop', 'key'),
+                conn.cmd('rpop', 'key')
+            ]).then(function(values) {
+                expect(values[3]).toEqual('zero');
+                expect(values[4]).toEqual('two');
+                done();
+            });
+        });
+
+        
+
     });
 }
 

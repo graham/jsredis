@@ -1,5 +1,5 @@
 /*
-Copyright [2014] [Graham Abbott <graham.abbott@gmail.com>]
+Copyright [2015] [Graham Abbott <graham.abbott@gmail.com>]
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@ var jsredis = (function(options) {
     if (!options) {
         options = {};
     }
-    
+
+    var JSON_START_CHAR = '!';
     var DEBUG = options['debug'] || false;
 	var TIMEOUT = options['timeout'] || 0;
 
@@ -204,7 +205,7 @@ var jsredis = (function(options) {
 	    return new Promise(function(resolve, reject) {
 	        var key = args[0];
 	        var json_data = JSON.stringify(args[1]);
-	        _this.run(['set', key, json_data]).then(function() {
+	        _this.run(['set', key, JSON_START_CHAR + json_data]).then(function() {
 	            resolve();
 	        }, function(more) {
 	            general_failure(more, _this, args);
@@ -216,7 +217,11 @@ var jsredis = (function(options) {
 	    return new Promise(function(resolve, reject) {
 	        var key = args[0];
 	        _this.run(['get', key]).then(function(data) {
-	            resolve(JSON.parse(data));
+                if (data[0] != JSON_START_CHAR) {
+                    reject('not a json value');
+                } else {
+	                resolve(JSON.parse(data.slice(1)));
+                }
 	        }, function(more) {
 	            general_failure(more, _this, args);
 	        });
@@ -228,15 +233,19 @@ var jsredis = (function(options) {
 	        var key = args[0];
 	        var func = args[1];
 	        _this.run(['get', key]).then(function(data) {
-	            try {
-	                var new_value = func(JSON.parse(data));
-	            } catch (e) {
-	                reject(e, _this, args);
-	                return
-	            }
-	            _this.run(['set', key, JSON.stringify(new_value)]).then(function() {
-	                resolve(new_value);
-	            });
+                if (data[0] != JSON_START_CHAR) {
+                    reject('not a json value');
+                } else {
+	                try {
+	                    var new_value = func(JSON.parse(data.slice(1)));
+	                } catch (e) {
+	                    reject(e, _this, args);
+	                    return
+	                }
+	                _this.run(['set', key, JSON_START_CHAR + JSON.stringify(new_value)]).then(function() {
+	                    resolve(new_value);
+	                });
+                }
 	        }, function(more) {
 	            general_failure(more, _this, args);
 	        });
@@ -247,16 +256,16 @@ var jsredis = (function(options) {
 	    return new Promise(function(resolve, reject) {
 	        _this.run(['get', args[0]]).then(function(data) {
 	            if (data == undefined) {
-	                _this.run(['set', args[0], '!' + JSON.stringify(args.slice(1))]).then(function() {
+	                _this.run(['set', args[0], JSON_START_CHAR + JSON.stringify(args.slice(1))]).then(function() {
 	                    _this.unblocking_key_change(args[0]);
 	                    resolve();
 	                });
-	            } else if (data[0] != '!') {
+	            } else if (data[0] != JSON_START_CHAR) {
 	                resolve("Wrong type: " + data);
 	            } else {
-	                var prev = JSON.parse(data.slice(1));
+	                var prev = JSON.parse(data.slice(1)); // slice is for the JSON_START_CHAR
 	                var next = args.slice(1).concat(prev);
-	                _this.run(['set', args[0], '!' + JSON.stringify(next)]).then(function() {
+	                _this.run(['set', args[0], JSON_START_CHAR + JSON.stringify(next)]).then(function() {
 	                    _this.unblocking_key_change(args[0]);                    
 	                    resolve();
 	                });
@@ -269,16 +278,16 @@ var jsredis = (function(options) {
 	    return new Promise(function(resolve, reject) {
 	        _this.run(['get', args[0]]).then(function(data) {
 	            if (data == undefined) {
-	                _this.run(['set', args[0], '!' + JSON.stringify(args.slice(1))]).then(function() {
+	                _this.run(['set', args[0], JSON_START_CHAR + JSON.stringify(args.slice(1))]).then(function() {
 	                    _this.unblocking_key_change(args[0]);
 	                    resolve();
 	                });
-	            } else if (data[0] != '!') {
+	            } else if (data[0] != JSON_START_CHAR) {
 	                resolve("Wrong type: " + data);
 	            } else {
-	                var prev = JSON.parse(data.slice(1));
+	                var prev = JSON.parse(data.slice(1)); // slice is for the JSON_START_CHAR
 	                var next = prev.concat(args.slice(1));
-	                _this.run(['set', args[0], '!' + JSON.stringify(next)]).then(function() {
+	                _this.run(['set', args[0], JSON_START_CHAR + JSON.stringify(next)]).then(function() {
 	                    _this.unblocking_key_change(args[0]);                    
 	                    resolve();
 	                });
@@ -287,10 +296,47 @@ var jsredis = (function(options) {
 	    });
 	};
 
+    Connector.prototype.cmd_lpop = function(_this, args) {
+	    return new Promise(function(resolve, reject) {
+	        _this.run(['get', args[0]]).then(function(data) {
+	            if (data == undefined) {
+	                resolve(undefined);
+	            } else if (data[0] != JSON_START_CHAR) {
+	                resolve("Wrong type: " + data);
+	            } else {
+	                var prev = JSON.parse(data.slice(1)); // slice is for the JSON_START_CHAR
+	                var next = prev.slice(1);
+	                _this.run(['set', args[0], JSON_START_CHAR + JSON.stringify(next)]).then(function() {
+	                    resolve(prev[0]);
+	                });
+	            }
+	        });
+	    });
+    };
+
+    Connector.prototype.cmd_rpop = function(_this, args) {
+	    return new Promise(function(resolve, reject) {
+	        _this.run(['get', args[0]]).then(function(data) {
+	            if (data == undefined) {
+	                resolve(undefined);
+	            } else if (data[0] != JSON_START_CHAR) {
+	                resolve("Wrong type: " + data);
+	            } else {
+	                var prev = JSON.parse(data.slice(1)); // slice is for the JSON_START_CHAR
+	                var next = prev.slice(0, prev.length-1);
+	                _this.run(['set', args[0], JSON_START_CHAR + JSON.stringify(next)]).then(function() {
+	                    resolve(prev[prev.length-1]);
+	                });
+	            }
+	        });
+	    });
+    };
+
 	Connector.prototype.cmd_blpop = function(_this, args) {
 	    return new Promise(function(resolve, reject) {
 	        var on_timeout = null;
-        
+            var keys = args.slice(0, args.length-1);
+            var timeout = args[args.length-1];
 	    });
 	};
 
@@ -309,6 +355,7 @@ var jsredis = (function(options) {
 	    if (callback != undefined) {
 	        return callback(this, args.slice(1));
 	    } else {
+            console.log("Command not found: " + command);
 	        throw "Command not found: " + command;
 	    }
 	};
@@ -413,6 +460,7 @@ var jsredis = (function(options) {
 	    if (callback != undefined) {
 	        return callback(this, args.slice(1), tx, store, index);
 	    } else {
+            console.log("Command not found: " + command);            
 	        throw "Command not found: " + command;
 	    }
 	};
