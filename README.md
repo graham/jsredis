@@ -13,20 +13,20 @@ Task list, only completed if there is a test that passes :)
 
 Simple stuff for any KVS:
 
-   - [ ] get
-   - [ ] set
-   - [ ] reset db
-   - [ ] exists
-   - [ ] keys
+   - [x] get
+   - [x] set
+   - [x] reset db
+   - [x] exists
+   - [x] keys
    - [ ] batch commands
-   - [ ] del
+   - [x] del
    - [ ] transactions
    - [ ] db lock (for multiple tabs).
 
 Plugins:
 
-   - [ ] localStorge / sessionStorage
-   - [ ] IndexedDB
+   - [x] localStorge / sessionStorage
+   - [x] IndexedDB
 
 ## Redis Commands:
 
@@ -45,17 +45,17 @@ Lists:
    - [ ] brpoplpush
    - [ ] lindex
    - [ ] linsert
-   - [ ] llen
-   - [ ] lpop
-   - [ ] lpush
+   - [x] llen
+   - [x] lpop
+   - [x] lpush
    - [ ] lpushx
-   - [ ] lrange
+   - [x] lrange
    - [ ] lrem
    - [ ] lset
    - [ ] ltrim
-   - [ ] rpop
+   - [x] rpop
    - [ ] rpoplpush
-   - [ ] rpush
+   - [x] rpush
    - [ ] rpushx
 
 Strings:
