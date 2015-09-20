@@ -203,6 +203,22 @@ function do_tests(connector_constructor, name) {
             });
         });
 
+        it("lrange should give you items in a list.", function(done) {
+            conn.all([
+                conn.cmd('rpush', 'key', 'one'),
+                conn.cmd('rpush', 'key', 'two'),
+                conn.cmd('lpush', 'key', 'zero'),
+            ]).then(function(values) {
+                return conn.cmd('lrange', 'key', 0, 10)
+            }).then(function(values) {
+                expect(values).toEqual(['zero', 'one', 'two']);
+                return conn.cmd('lrange', 'key', 0, 1);
+            }).then(function(values) {
+                expect(values).toEqual(['zero', 'one']);
+                done();
+            });
+        });
+
         
 
     });

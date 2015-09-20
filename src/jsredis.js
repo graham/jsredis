@@ -332,6 +332,28 @@ var jsredis = (function(options) {
         });
     };
 
+    Connector.prototype.cmd_lrange = function(_this, args) {
+        return new Promise(function(resolve, reject) {
+            _this.run(['get', args[0]]).then(function(data) {
+                if (data == undefined) {
+                    resolve([]);
+                } else if (data[0] != JSON_START_CHAR) {
+                    resolve("Wrong type: " + data);
+                } else {
+                    var prev = JSON.parse(data.slice(1)); // slice is for the JSON_START_CHAR
+                    var start_index = args[1];
+                    var end_index = args[2];
+
+                    if (end_index < 0) {
+                        end_index += prev.length;
+                    }
+                    
+                    resolve(prev.slice(start_index, end_index+1));
+                }
+            });
+        });
+    };
+
     Connector.prototype.cmd_blpop = function(_this, args) {
         return new Promise(function(resolve, reject) {
             var on_timeout = null;
