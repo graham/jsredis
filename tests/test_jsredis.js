@@ -219,6 +219,19 @@ function do_tests(connector_constructor, name) {
             });
         });
 
+        it("llen: give the arity of the list (or zero).", function(done) {
+            conn.all([
+                conn.cmd('rpush', 'key', 'one'),
+                conn.cmd('rpush', 'key', 'two'),
+                conn.cmd('lpush', 'key', 'zero'),
+            ]).then(function(values) {
+                return conn.cmd('llen', 'key');
+            }).then(function(values) {
+                expect(values).toEqual(3);
+                done();
+            });
+        });
+
         
 
     });

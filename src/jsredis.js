@@ -354,6 +354,21 @@ var jsredis = (function(options) {
         });
     };
 
+    Connector.prototype.cmd_llen = function(_this, args) {
+        return new Promise(function(resolve, reject) {
+            _this.run(['get', args[0]]).then(function(data) {
+                if (data == undefined) {
+                    resolve(0);
+                } else if (data[0] != JSON_START_CHAR) {
+                    resolve("Wrong type: " + data);
+                } else {
+                    var prev = JSON.parse(data.slice(1)); // slice is for the JSON_START_CHAR
+                    resolve(prev.length);
+                }
+            });
+        });
+    };
+    
     Connector.prototype.cmd_blpop = function(_this, args) {
         return new Promise(function(resolve, reject) {
             var on_timeout = null;
