@@ -354,6 +354,27 @@ var jsredis = (function(options) {
         });
     };
 
+    Connector.prototype.cmd_lindex = function(_this, args) {
+        return new Promise(function(resolve, reject) {
+            _this.run(['get', args[0]]).then(function(data) {
+                if (data == undefined) {
+                    resolve([]);
+                } else if (data[0] != JSON_START_CHAR) {
+                    resolve("Wrong type: " + data);
+                } else {
+                    var prev = JSON.parse(data.slice(1)); // slice is for the JSON_START_CHAR
+                    var index = args[1];
+
+                    if (index < 0) {
+                        index += prev.length;
+                    }
+
+                    resolve(prev[index]);
+                }
+            });
+        });
+    };
+
     Connector.prototype.cmd_llen = function(_this, args) {
         return new Promise(function(resolve, reject) {
             _this.run(['get', args[0]]).then(function(data) {
@@ -368,7 +389,32 @@ var jsredis = (function(options) {
             });
         });
     };
-    
+
+    Connector.prototype.cmd_lset = function(_this, args) {
+        return new Promise(function(resolve, reject) {
+            _this.run(['get', args[0]]).then(function(data) {
+                if (data == undefined) {
+                    resolve(undefined);
+                } else if (data[0] != JSON_START_CHAR) {
+                    resolve("Wrong type: " + data);
+                } else {
+                    var index = args[1];
+                    var value = args[2];
+                    var prev = JSON.parse(data.slice(1)); // slice is for the JSON_START_CHAR
+
+                    if (index < 0) {
+                        index += prev.length+1;
+                    }
+
+                    prev[index] = value;
+                    _this.run(['set', args[0], JSON_START_CHAR + JSON.stringify(prev)]).then(function() {
+                        resolve(prev[prev.length-1]);
+                    });
+                }
+            });
+        });
+    };
+
     Connector.prototype.cmd_blpop = function(_this, args) {
         return new Promise(function(resolve, reject) {
             var on_timeout = null;

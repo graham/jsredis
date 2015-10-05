@@ -232,7 +232,39 @@ function do_tests(connector_constructor, name) {
             });
         });
 
-        
+        it("lset: Sets the list element at index to value.", function(done) {
+            conn.all([
+                conn.cmd('rpush', 'key', 'one'),
+                conn.cmd('rpush', 'key', 'two'),
+                conn.cmd('rpush', 'key', 'three'),
+                conn.cmd('lset', 'key', 0, 'four'),
+                conn.cmd('lset', 'key', -2, 'five')
+            ]).then(function(values) {
+                return conn.cmd('lrange', 'key', 0, 10);
+            }).then(function(values) {
+                expect(values).toEqual([
+                    'four',
+                    'two',
+                    'five'
+                ]);
+                done();
+            });
+        });
+
+        it("lindex: Returns the element at index index in the list stored at key.", function(done) {
+            conn.all([
+                conn.cmd('lpush', 'mylist', 'World'),
+                conn.cmd('lpush', 'mylist', 'Hello'),
+            ]).then(function(values) {
+                return conn.cmd('lindex', 'mylist', 0);
+            }).then(function(values) {
+                expect(values).toEqual("Hello");
+                return conn.cmd('lindex', 'mylist', -1);
+            }).then(function(values) {
+                expect(values).toEqual("World");
+                done();
+            });
+        });
 
     });
 }
