@@ -14,6 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+var LoudPromise = function(callback) {
+    var p = new Promise(callback);
+    p.then(function() {}, function(error) {
+        console.log("ERROR: " + error);
+    });
+    return p;
+}
+
 var jsredis = (function(options) {
     if (!options) {
         options = {};
@@ -425,11 +433,11 @@ var jsredis = (function(options) {
                 } else {
                     var index = args[1];
                     var prev = JSON.parse(data.slice(1)); // slice is for the JSON_START_CHAR
-
+                    
                     if (index < 0) {
                         index += prev.length+1;
                     }
-                    
+
                     prev = prev.slice(0, index).concat(prev.slice(index+1, prev.length));
                     _this.run(['set', args[0], JSON_START_CHAR + JSON.stringify(prev)]).then(function() {
                         resolve(prev[prev.length-1]);

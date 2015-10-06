@@ -276,6 +276,11 @@ function do_tests(connector_constructor, name) {
                 return conn.cmd('lrange', 'mylist', 0, -1);
             }).then(function(value) {
                 expect(value).toEqual(['Hello', 'wootwoot']);
+                return conn.cmd('lrem', 'mylist', 0);
+            }).then(function() {
+                return conn.cmd('lrange', 'mylist', 0, -1);
+            }).then(function(value) {
+                expect(value).toEqual(['wootwoot']);
                 done();
             });
         });
