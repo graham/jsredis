@@ -266,17 +266,17 @@ function do_tests(connector_constructor, name) {
             });
         });
 
-        it("lrem: Removes element by index, (not in real redis :( ).", function(done) {
+        it("lremindex: Removes element by index, (not in real redis :( ).", function(done) {
             conn.all([
                 conn.cmd('lpush', 'mylist', 'World'),
                 conn.cmd('lpush', 'mylist', 'Hello'),
                 conn.cmd('rpush', 'mylist', 'wootwoot'),
-                conn.cmd('lrem', 'mylist', 1)
+                conn.cmd('lremindex', 'mylist', 1)
             ]).then(function(values) {
                 return conn.cmd('lrange', 'mylist', 0, -1);
             }).then(function(value) {
                 expect(value).toEqual(['Hello', 'wootwoot']);
-                return conn.cmd('lrem', 'mylist', 0);
+                return conn.cmd('lremindex', 'mylist', 0);
             }).then(function() {
                 return conn.cmd('lrange', 'mylist', 0, -1);
             }).then(function(value) {

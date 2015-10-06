@@ -423,7 +423,7 @@ var jsredis = (function(options) {
         });
     };
 
-    Connector.prototype.cmd_lrem = function(_this, args) {
+    Connector.prototype.cmd_lremindex = function(_this, args) {
         return new Promise(function(resolve, reject) {
             _this.run(['get', args[0]]).then(function(data) {
                 if (data == undefined) {

@@ -43,7 +43,7 @@ Lists:
    - [ ] blpop
    - [ ] brpop
    - [ ] brpoplpush
-   - [ ] lindex
+   - [x] lindex
    - [ ] linsert
    - [x] llen
    - [x] lpop
@@ -51,7 +51,7 @@ Lists:
    - [ ] lpushx
    - [x] lrange
    - [ ] lrem
-   - [ ] lset
+   - [x] lset
    - [ ] ltrim
    - [x] rpop
    - [ ] rpoplpush
