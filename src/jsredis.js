@@ -415,6 +415,30 @@ var jsredis = (function(options) {
         });
     };
 
+    Connector.prototype.cmd_lrem = function(_this, args) {
+        return new Promise(function(resolve, reject) {
+            _this.run(['get', args[0]]).then(function(data) {
+                if (data == undefined) {
+                    resolve(undefined);
+                } else if (data[0] != JSON_START_CHAR) {
+                    resolve("Wrong type: " + data);
+                } else {
+                    var index = args[1];
+                    var prev = JSON.parse(data.slice(1)); // slice is for the JSON_START_CHAR
+
+                    if (index < 0) {
+                        index += prev.length+1;
+                    }
+                    
+                    prev = prev.slice(0, index).concat(prev.slice(index+1, prev.length));
+                    _this.run(['set', args[0], JSON_START_CHAR + JSON.stringify(prev)]).then(function() {
+                        resolve(prev[prev.length-1]);
+                    });
+                }
+            });
+        });
+    };
+
     Connector.prototype.cmd_blpop = function(_this, args) {
         return new Promise(function(resolve, reject) {
             var on_timeout = null;
