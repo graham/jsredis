@@ -455,6 +455,51 @@ var jsredis = (function(options) {
         });
     };
 
+    Connector.prototype.cmd_save = function(_this, args) {
+        return new Promise(function(resolve, reject) {
+            var results = {};
+            var last = null;
+
+            _this.run(['keys']).then(function(data) {
+                console.log(data);
+                for(var i = 0; i < data.length; i++) {
+                    var key = data[i];
+                    (function(k) {
+                        last = _this.run(['get', key]).then(function(value) {
+                            results[k] = value;
+                        });
+                    })(key);
+                }
+
+                if (last != null) {
+                    last.then(function() {
+                        resolve(results);
+                    });
+                } else {
+                    resolve({});
+                }
+            });
+        });
+    };
+
+    Connector.prototype.cmd_update = function(_this, args) {
+        return new Promise(function(resolve, reject) {
+            var dict = args[0];
+            var last = null;
+            for(var key in dict) {
+                var value = dict[key];
+                last = _this.run(['set', key, value]);
+            }
+            if (last != null) {
+                last.then(function() {
+                    resolve(null);
+                });
+            } else {
+                resolve(null);
+            }
+        });
+    };
+
     var Connector_LocalStorage = function() {
         this.ready = new Promise(function(resolve, reject) {
             resolve();
