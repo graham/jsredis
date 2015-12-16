@@ -98,6 +98,10 @@ class Database {
     }
 
     keys() {
+        var tx = this.db.transaction(["keys"], "readwrite");
+        var store = tx.objectStore("keys");
+        var index = store.index("key");
+
         return new Promise((resolve, reject) => {
             var values = [];
             store.openCursor().onsuccess = (event) => {
@@ -113,6 +117,10 @@ class Database {
     }
 
     clear() {
+        var tx = this.db.transaction(["keys"], "readwrite");
+        var store = tx.objectStore("keys");
+        var index = store.index("key");
+
         return new Promise((resolve, reject) => {
             var request = store.clear();
             request.onsuccess = () => {
